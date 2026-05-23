@@ -1,8 +1,13 @@
 -- Schema para Radar Geek SP
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Remover tabelas antigas para evitar conflito com schemas anteriores
+DROP TABLE IF EXISTS eventos CASCADE;
+DROP TABLE IF EXISTS locais_fixos CASCADE;
+DROP TABLE IF EXISTS historico_scraping CASCADE;
+
 -- 1. Tabela de Locais Fixos (As Bases)
-CREATE TABLE IF NOT EXISTS locais_fixos (
+CREATE TABLE locais_fixos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome TEXT NOT NULL,
     descricao TEXT,
