@@ -12,11 +12,12 @@ export default function App() {
   // Dados do Supabase
   const [eventos, setEventos] = useState([])
   const [locais, setLocais] = useState([])
+  const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   // Estados de navegação e filtros
-  const [activeTab, setActiveTab] = useState('eventos') // 'eventos' | 'locais'
+  const [activeTab, setActiveTab] = useState('eventos') // 'eventos' | 'locais' | 'logs'
   const [searchQuery, setSearchQuery] = useState('')
   const [filterOption, setFilterOption] = useState('todos')
   const [selectedLocal, setSelectedLocal] = useState(null)
@@ -41,8 +42,25 @@ export default function App() {
 
         if (eventosErr) throw eventosErr
 
+        // 3. Buscar logs de scraping (tabela opcional historico_scraping)
+        let logsData = []
+        try {
+          const { data, error: logsErr } = await supabase
+            .from('historico_scraping')
+            .select('*')
+            .order('executado_em', { ascending: false })
+          if (!logsErr) {
+            logsData = data
+          } else {
+            console.warn("historico_scraping erro:", logsErr)
+          }
+        } catch (e) {
+          console.warn("Erro ao ler tabela historico_scraping:", e)
+        }
+
         setLocais(locaisData || [])
         setEventos(eventosData || [])
+        setLogs(logsData || [])
       } else {
         // Fallback offline: buscar do arquivo data.json gerado localmente
         const res = await fetch('/data.json')
@@ -50,10 +68,12 @@ export default function App() {
           const localData = await res.json()
           setLocais(localData.locais || [])
           setEventos(localData.eventos || [])
+          setLogs(localData.logs || [])
         } else {
           // Sem configuração e sem arquivo local
           setLocais([])
           setEventos([])
+          setLogs([])
         }
       }
     } catch (err) {
@@ -201,6 +221,12 @@ export default function App() {
           >
             🏰 Lugares Fixos
           </button>
+          <button 
+            className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
+            onClick={() => setActiveTab('logs')}
+          >
+            ⚙️ Painel do Scraper
+          </button>
         </div>
       )}
 
@@ -213,7 +239,7 @@ export default function App() {
       )}
 
       {/* PAINEL DE CONTROLE (BUSCA / FILTRO) */}
-      {(config.isConfigured || eventos.length > 0 || locais.length > 0) && !loading && (
+      {(config.isConfigured || eventos.length > 0 || locais.length > 0) && activeTab !== 'logs' && !loading && (
         <div className="controls-bar">
           <div className="search-input-container">
             <span className="search-icon-inside">🔍</span>
@@ -284,6 +310,9 @@ export default function App() {
                     </div>
                     <div className="card-content">
                       <h3 className="card-title">{evento.titulo}</h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4', height: '2.8rem' }}>
+                        {evento.descricao || 'Sem descrição cadastrada para este evento.'}
+                      </p>
                       <div className="card-meta-row">
                         <span>📅 {formatarData(evento.data_hora)}</span>
                       </div>
@@ -329,6 +358,9 @@ export default function App() {
                     </div>
                     <div className="card-content">
                       <h3 className="card-title">{local.nome}</h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4', height: '2.8rem' }}>
+                        {local.descricao || 'Sem descrição detalhada disponível.'}
+                      </p>
                       <div className="card-tags">
                         {local.tags_consumo?.map((tag, idx) => (
                           <span key={idx} className={`tag-badge ${
@@ -349,6 +381,126 @@ export default function App() {
                 <p className="empty-desc">Verifique se os dados estão populados ou modifique os termos da pesquisa.</p>
               </div>
             )
+          )}
+
+          {activeTab === 'logs' && (
+            <div style={{ animation: 'fade-in 0.3s ease-out' }}>
+              {/* Cards de Métricas */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bases Monitoradas</span>
+                  <span style={{ fontSize: '2rem', fontWeight: '800', fontFamily: 'var(--font-display)', color: 'var(--accent-secondary)' }}>
+                    {locais.length} locais
+                  </span>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Execuções Scraper</span>
+                  <span style={{ fontSize: '2rem', fontWeight: '800', fontFamily: 'var(--font-display)', color: 'var(--text-main)' }}>
+                    {logs.length} runs
+                  </span>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Última Sincronização</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-main)', marginTop: '0.5rem' }}>
+                    {logs.length > 0 ? formatarData(logs[0].executado_em) : 'Nenhuma execução registrada'}
+                  </span>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status do Motor</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: '700', color: 'var(--color-safe)', marginTop: '0.5rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '5px', background: 'var(--color-safe)', display: 'inline-block', boxShadow: '0 0 10px var(--color-safe)', animation: 'pulse-glow 1.5s infinite alternate' }}></span>
+                    Ativo via GitHub Actions
+                  </span>
+                </div>
+              </div>
+
+              {/* Console de Logs Ultima Execução */}
+              <div style={{ marginBottom: '2.5rem' }}>
+                <h3 className="modal-section-title">📺 Console do Último Scraping</h3>
+                {logs.length > 0 ? (
+                  <div style={{ 
+                    background: '#0d1117', 
+                    border: '1px solid #30363d', 
+                    borderRadius: '12px', 
+                    padding: '1.25rem', 
+                    fontFamily: 'Courier New, Courier, monospace', 
+                    fontSize: '0.85rem', 
+                    color: '#39ff14', 
+                    maxHeight: '260px', 
+                    overflowY: 'auto', 
+                    whiteSpace: 'pre-line',
+                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.8)'
+                  }}>
+                    {logs[0].logs || 'Logs vazios para esta execução.'}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
+                    Nenhum console de log registrado.
+                  </p>
+                )}
+              </div>
+
+              {/* Histórico e Configuração Local */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+                {/* Tabela de Runs */}
+                <div>
+                  <h3 className="modal-section-title">🕒 Histórico de Sincronizações</h3>
+                  <div style={{ overflowX: 'auto', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                          <th style={{ padding: '0.75rem 1rem' }}>Data</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Novos Eventos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logs.slice(0, 5).map((log, index) => (
+                          <tr key={log.id || index} style={{ borderBottom: index < 4 ? '1px solid var(--border)' : 'none' }}>
+                            <td style={{ padding: '0.75rem 1rem', fontWeight: '500' }}>{new Date(log.executado_em).toLocaleDateString('pt-BR')}</td>
+                            <td style={{ padding: '0.75rem 1rem' }}>
+                              <span style={{ color: log.sucesso ? 'var(--color-safe)' : 'var(--color-danger)', fontWeight: '600' }}>
+                                {log.sucesso ? 'Sucesso' : 'Falha'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--accent-secondary)', fontWeight: '700' }}>+{log.eventos_novos}</td>
+                          </tr>
+                        ))}
+                        {logs.length === 0 && (
+                          <tr>
+                            <td colSpan="3" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sem registros de execuções.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Comandos do Scraper Local */}
+                <div style={{ background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    💻 Rodar Scraper Local com IA
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '1.25rem' }}>
+                    Você pode acionar o scraper na sua máquina para testar a classificação por Inteligência Artificial (Gemini) e atualizar o banco do Supabase instantaneamente.
+                  </p>
+                  
+                  <div style={{ background: '#0a0a0a', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--accent-secondary)', marginBottom: '1rem', overflowX: 'auto' }}>
+                    npm run scrape
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                    <p style={{ fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Como plugar as chaves reais:</p>
+                    <p>Adicione estas variáveis no arquivo <strong style={{ color: 'var(--text-main)' }}>.env</strong> raiz ou do frontend:</p>
+                    <ul style={{ paddingLeft: '1.25rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <li><code>GEMINI_API_KEY=sua_chave</code> (Google AI Studio)</li>
+                      <li><code>SUPABASE_URL=seu_link</code></li>
+                      <li><code>SUPABASE_KEY=sua_service_role_key</code></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -383,6 +535,9 @@ export default function App() {
               </div>
             </div>
             <div className="modal-body">
+              <p style={{ fontSize: '0.92rem', color: 'var(--text-main)', lineHeight: '1.5', marginBottom: '1.5rem', background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                {selectedLocal.descricao || 'Sem descrição cadastrada.'}
+              </p>
               <div className="modal-info-grid">
                 <div className="modal-info-item">
                   <span className="info-label">Distância Estimada</span>
