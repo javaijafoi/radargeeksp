@@ -1,0 +1,108 @@
+{
+  "locais": [
+    {
+      "nome": "Taverna Medieval",
+      "tags_consumo": [
+        "medieval",
+        "hamburguer",
+        "medieval-core"
+      ],
+      "distancia_mooca": 25,
+      "imagem_hero_path": "https://placehold.co/600x400/2c1b4d/FFFFFF?text=Taverna+Medieval",
+      "id": "5a58e4ff-89f5-4faa-95a0-baf04f5dec84"
+    },
+    {
+      "nome": "Ludoteria SP",
+      "tags_consumo": [
+        "plant-based",
+        "zero-lactose",
+        "jogos-tabuleiro"
+      ],
+      "distancia_mooca": 40,
+      "imagem_hero_path": "https://placehold.co/600x400/0f3a1a/FFFFFF?text=Ludoteria",
+      "id": "7db1a179-edbd-4a88-aafc-877b30e3f52c"
+    },
+    {
+      "nome": "Coffee & Games",
+      "tags_consumo": [
+        "cafeteria",
+        "zero-lactose",
+        "videogames"
+      ],
+      "distancia_mooca": 15,
+      "imagem_hero_path": "https://placehold.co/600x400/3e2723/FFFFFF?text=Coffee+and+Games",
+      "id": "e056f6b4-68aa-411c-b1e3-ed79ab8dc698"
+    }
+  ],
+  "eventos": [
+    {
+      "titulo": "Mega Encontro de RPG (Taverna)",
+      "data_hora": "2026-05-23T18:16:34.108Z",
+      "ia_score_cilada": 9,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://placehold.co/600x400/311b92/FFFFFF?text=RPG+Taverna",
+      "local_id": "5a58e4ff-89f5-4faa-95a0-baf04f5dec84",
+      "id": "98d75199-cac7-4a0d-a15a-f067a50834bb",
+      "locais_fixos": {
+        "nome": "Taverna Medieval",
+        "tags_consumo": [
+          "medieval",
+          "hamburguer",
+          "medieval-core"
+        ],
+        "distancia_mooca": 25,
+        "imagem_hero_path": "https://placehold.co/600x400/2c1b4d/FFFFFF?text=Taverna+Medieval",
+        "id": "5a58e4ff-89f5-4faa-95a0-baf04f5dec84"
+      }
+    },
+    {
+      "titulo": "Campeonato de Catan e Hambúrguer Vegano",
+      "data_hora": "2026-05-23T18:16:34.109Z",
+      "ia_score_cilada": 9,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://placehold.co/600x400/1b5e20/FFFFFF?text=Catan+Vegano",
+      "local_id": "7db1a179-edbd-4a88-aafc-877b30e3f52c",
+      "id": "7bf974fb-4adc-40e3-9486-cb87d8c264f1",
+      "locais_fixos": {
+        "nome": "Ludoteria SP",
+        "tags_consumo": [
+          "plant-based",
+          "zero-lactose",
+          "jogos-tabuleiro"
+        ],
+        "distancia_mooca": 40,
+        "imagem_hero_path": "https://placehold.co/600x400/0f3a1a/FFFFFF?text=Ludoteria",
+        "id": "7db1a179-edbd-4a88-aafc-877b30e3f52c"
+      }
+    },
+    {
+      "titulo": "Feira Geek de Calçadão",
+      "data_hora": "2026-05-23T18:16:34.109Z",
+      "ia_score_cilada": 4,
+      "kid_friendly": false,
+      "imagem_flyer_path": "https://placehold.co/600x400/b71c1c/FFFFFF?text=Feira+Baguncada",
+      "id": "bd2a16fa-8af0-4139-8fbc-0465796d6b20"
+    },
+    {
+      "titulo": "Torneio de Smash Bros & Café Express",
+      "data_hora": "2026-05-23T18:16:34.109Z",
+      "ia_score_cilada": 7,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://placehold.co/600x400/e65100/FFFFFF?text=Smash+Bros",
+      "local_id": "e056f6b4-68aa-411c-b1e3-ed79ab8dc698",
+      "id": "c46ac07c-ee6b-47e2-9bd3-52938f0a8bb3",
+      "locais_fixos": {
+        "nome": "Coffee & Games",
+        "tags_consumo": [
+          "cafeteria",
+          "zero-lactose",
+          "videogames"
+        ],
+        "distancia_mooca": 15,
+        "imagem_hero_path": "https://placehold.co/600x400/3e2723/FFFFFF?text=Coffee+and+Games",
+        "id": "e056f6b4-68aa-411c-b1e3-ed79ab8dc698"
+      }
+    }
+  ],
+  "exportado_em": "2026-05-23T18:16:34.110Z"
+}

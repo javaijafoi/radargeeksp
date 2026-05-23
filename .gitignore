@@ -1,0 +1,21 @@
+# Node
+web/node_modules/
+web/dist/
+web/.env
+web/.env.local
+web/.env.*.local
+
+# Android / Gradle
+.gradle/
+**/build/
+**/local.properties
+.kotlin/
+*.apk
+app/build/
+
+# Python / OS
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
