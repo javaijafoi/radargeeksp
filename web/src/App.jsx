@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { supabase, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from './supabase'
+import { supabase, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig, getSupabaseAdminClient } from './supabase'
 
 export default function App() {
   const [config, setConfig] = useState(getSupabaseConfig())
@@ -8,6 +8,26 @@ export default function App() {
   // Inputs de configuração temporários
   const [inputUrl, setInputUrl] = useState(config.url)
   const [inputAnonKey, setInputAnonKey] = useState(config.anonKey)
+  const [inputServiceKey, setInputServiceKey] = useState(config.serviceKey || '')
+
+  // Estados de carregamento do Scraper na Vercel
+  const [scrapeLoading, setScrapeLoading] = useState(false)
+
+  // Formulário - Cadastrar Nova Base (Local Fixo)
+  const [localNome, setLocalNome] = useState('')
+  const [localDesc, setLocalDesc] = useState('')
+  const [localTags, setLocalTags] = useState('')
+  const [localDist, setLocalDist] = useState('')
+  const [localImg, setLocalImg] = useState('')
+
+  // Formulário - Cadastrar Novo Evento
+  const [eventoTitulo, setEventoTitulo] = useState('')
+  const [eventoDesc, setEventoDesc] = useState('')
+  const [eventoData, setEventoData] = useState('')
+  const [eventoScore, setEventoScore] = useState(7)
+  const [eventoKids, setEventoKids] = useState(false)
+  const [eventoImg, setEventoImg] = useState('')
+  const [eventoLocalId, setEventoLocalId] = useState('')
 
   // Dados do Supabase
   const [eventos, setEventos] = useState([])
@@ -95,7 +115,7 @@ export default function App() {
       alert('Por favor, preencha todos os campos.')
       return
     }
-    saveSupabaseConfig(inputUrl, inputAnonKey)
+    saveSupabaseConfig(inputUrl, inputAnonKey, inputServiceKey)
     setConfig(getSupabaseConfig())
     setShowSettings(false)
     // Forçar recarga da página para reinicializar o cliente supabase
@@ -109,9 +129,115 @@ export default function App() {
       setConfig(getSupabaseConfig())
       setEventos([])
       setLocais([])
+      setLogs([])
       setInputUrl('')
       setInputAnonKey('')
+      setInputServiceKey('')
       setShowSettings(true)
+    }
+  }
+
+  // Ação de Cadastrar Local Administrativamente (Bypass RLS)
+  const handleCreateLocal = async (e) => {
+    e.preventDefault()
+    const admin = getSupabaseAdminClient()
+    if (!admin) {
+      alert("Chave Service Role ausente nas configurações.")
+      return
+    }
+    setLoading(true)
+    try {
+      const tagsArray = localTags.split(',').map(t => t.trim()).filter(Boolean)
+      const { error: insertErr } = await admin
+        .from('locais_fixos')
+        .insert([{
+          nome: localNome,
+          descricao: localDesc,
+          tags_consumo: tagsArray,
+          distancia_mooca: parseInt(localDist) || 0,
+          imagem_hero_path: localImg || null
+        }])
+
+      if (insertErr) throw insertErr
+      
+      alert(`Base '${localNome}' cadastrada com sucesso!`)
+      setLocalNome('')
+      setLocalDesc('')
+      setLocalTags('')
+      setLocalDist('')
+      setLocalImg('')
+      await fetchDados() // Recarregar
+    } catch (err) {
+      console.error(err)
+      alert(`Erro ao cadastrar local: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Ação de Cadastrar Evento Administrativamente (Bypass RLS)
+  const handleCreateEvento = async (e) => {
+    e.preventDefault()
+    const admin = getSupabaseAdminClient()
+    if (!admin) {
+      alert("Chave Service Role ausente nas configurações.")
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: insertErr } = await admin
+        .from('eventos')
+        .insert([{
+          titulo: eventoTitulo,
+          descricao: eventoDesc,
+          data_hora: new Date(eventoData).toISOString(),
+          ia_score_cilada: parseInt(eventoScore) || 5,
+          kid_friendly: eventoKids,
+          imagem_flyer_path: eventoImg || null,
+          local_id: eventoLocalId || null
+        }])
+
+      if (insertErr) throw insertErr
+
+      alert(`Evento '${eventoTitulo}' cadastrado com sucesso!`)
+      setEventoTitulo('')
+      setEventoDesc('')
+      setEventoData('')
+      setEventoScore(7)
+      setEventoKids(false)
+      setEventoImg('')
+      setEventoLocalId('')
+      await fetchDados() // Recarregar
+    } catch (err) {
+      console.error(err)
+      alert(`Erro ao cadastrar evento: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Disparar o scraper na Nuvem (Vercel Serverless Function)
+  const triggerScrapeNuvem = async () => {
+    setScrapeLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST'
+      })
+      if (!res.ok) {
+        throw new Error(`Servidor respondeu com status ${res.status}`)
+      }
+      const data = await res.json()
+      if (data.sucesso) {
+        alert('Raspagem e classificação acionadas com sucesso na Nuvem!')
+        await fetchDados() // Sincroniza os novos eventos e logs
+      } else {
+        setError(`Erro na raspagem da Nuvem: ${data.logs || 'Sem detalhes'}`)
+      }
+    } catch (e) {
+      setError(`Esse botão funciona após o deploy na Vercel com as variáveis de ambiente setadas. Para rodar agora na sua máquina local, digite 'npm run scrape' no seu terminal. Detalhes: ${e.message}`)
+    } finally {
+      setScrapeLoading(false)
     }
   }
 
@@ -416,7 +542,17 @@ export default function App() {
 
               {/* Console de Logs Ultima Execução */}
               <div style={{ marginBottom: '2.5rem' }}>
-                <h3 className="modal-section-title">📺 Console do Último Scraping</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 className="modal-section-title" style={{ marginBottom: '0' }}>📺 Console do Último Scraping</h3>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={triggerScrapeNuvem} 
+                    disabled={scrapeLoading}
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                  >
+                    {scrapeLoading ? 'Executando Varredura...' : '🚀 Rodar Scraper na Vercel (Cloud)'}
+                  </button>
+                </div>
                 {logs.length > 0 ? (
                   <div style={{ 
                     background: '#0d1117', 
@@ -441,7 +577,7 @@ export default function App() {
               </div>
 
               {/* Histórico e Configuração Local */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
                 {/* Tabela de Runs */}
                 <div>
                   <h3 className="modal-section-title">🕒 Histórico de Sincronizações</h3>
@@ -499,6 +635,110 @@ export default function App() {
                     </ul>
                   </div>
                 </div>
+              </div>
+
+              {/* Painel Admin (Cadastro Manual) */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '2.5rem' }}>
+                <h3 className="modal-section-title" style={{ fontSize: '1.4rem', color: 'var(--accent-secondary)', marginBottom: '0.5rem' }}>
+                  🛠️ Painel Administrativo de Cadastro
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                  Habilidade de cadastrar locais e agendas geek manualmente sem abrir o dashboard do Supabase.
+                </p>
+                
+                {config.isAdmin ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+                    {/* Form Local */}
+                    <form onSubmit={handleCreateLocal} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', color: 'var(--text-main)' }}>
+                        🏰 Cadastrar Nova Base (Local)
+                      </h4>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>Nome da Base</label>
+                        <input type="text" className="form-input" style={{ padding: '0.6rem' }} placeholder="Ex: Taverna Medieval" value={localNome} onChange={e => setLocalNome(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>Descrição Detalhada</label>
+                        <textarea className="form-input" style={{ padding: '0.6rem', minHeight: '60px', resize: 'vertical' }} placeholder="Descreva a história e atrativos do local..." value={localDesc} onChange={e => setLocalDesc(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>Tags de Consumo (separadas por vírgula)</label>
+                        <input type="text" className="form-input" style={{ padding: '0.6rem' }} placeholder="Ex: vegan, zero-lactose, RPG" value={localTags} onChange={e => setLocalTags(e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.7rem' }}>Distância Mooca (min)</label>
+                          <input type="number" className="form-input" style={{ padding: '0.6rem' }} placeholder="Ex: 25" value={localDist} onChange={e => setLocalDist(e.target.value)} required />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.7rem' }}>Imagem Hero (URL)</label>
+                          <input type="url" className="form-input" style={{ padding: '0.6rem' }} placeholder="https://..." value={localImg} onChange={e => setLocalImg(e.target.value)} />
+                        </div>
+                      </div>
+                      <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '0.6rem' }} disabled={loading}>
+                        {loading ? 'Salvando...' : '💾 Cadastrar Base Geek'}
+                      </button>
+                    </form>
+
+                    {/* Form Evento */}
+                    <form onSubmit={handleCreateEvento} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', color: 'var(--text-main)' }}>
+                        🗓️ Cadastrar Novo Evento
+                      </h4>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>Título do Evento</label>
+                        <input type="text" className="form-input" style={{ padding: '0.6rem' }} placeholder="Ex: Noite de Boardgames" value={eventoTitulo} onChange={e => setEventoTitulo(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>Descrição do Evento</label>
+                        <textarea className="form-input" style={{ padding: '0.6rem', minHeight: '60px', resize: 'vertical' }} placeholder="Detalhes do que vai rolar no evento..." value={eventoDesc} onChange={e => setEventoDesc(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.7rem' }}>Data & Hora</label>
+                          <input type="datetime-local" className="form-input" style={{ padding: '0.6rem' }} value={eventoData} onChange={e => setEventoData(e.target.value)} required />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.7rem' }}>Base (Local Fixo)</label>
+                          <select className="filter-select" style={{ width: '100%', padding: '0.6rem', borderRadius: '12px' }} value={eventoLocalId} onChange={e => setEventoLocalId(e.target.value)}>
+                            <option value="">Acontece fora de Bases (Geral)</option>
+                            {locais.map(loc => (
+                              <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.7rem' }}>Nota IA (Cilada Score)</label>
+                          <input type="number" min="1" max="10" className="form-input" style={{ padding: '0.6rem' }} value={eventoScore} onChange={e => setEventoScore(e.target.value)} required />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
+                          <input type="checkbox" id="adminKids" checked={eventoKids} onChange={e => setEventoKids(e.target.checked)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                          <label htmlFor="adminKids" style={{ fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer' }}>👶 Livre p/ Crianças</label>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '0.7rem' }}>URL do Flyer (Imagem)</label>
+                        <input type="url" className="form-input" style={{ padding: '0.6rem' }} placeholder="https://..." value={eventoImg} onChange={e => setEventoImg(e.target.value)} />
+                      </div>
+                      <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem', padding: '0.6rem' }} disabled={loading}>
+                        {loading ? 'Salvando...' : '💾 Cadastrar Evento'}
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <div style={{ background: 'rgba(139, 92, 246, 0.03)', border: '1px dashed var(--border)', borderRadius: '16px', padding: '2.5rem', textAlign: 'center' }}>
+                    <span style={{ fontSize: '2rem' }}>🔒</span>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginTop: '0.75rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>Painel de Criação Manual Bloqueado</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '520px', margin: '0 auto 1.5rem auto', lineHeight: '1.5' }}>
+                      Para cadastrar locais e agendas geek manualmente por esta interface, abra as **Configurações do Banco** e insira a sua <strong style={{ color: 'var(--text-main)' }}>Supabase Service Role Key</strong>. Ela concederá ao app permissões para gravar dados diretamente no banco.
+                    </p>
+                    <button className="btn" style={{ margin: '0 auto' }} onClick={() => setShowSettings(true)}>
+                      ⚙️ Abrir Configurações do Banco
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -617,6 +857,17 @@ export default function App() {
                 value={inputAnonKey}
                 onChange={(e) => setInputAnonKey(e.target.value)}
                 required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Supabase Service Role Key (Admin - Opcional)</label>
+              <input 
+                type="password" 
+                className="form-input" 
+                placeholder="Insira para habilitar cadastro de locais e eventos pela Web" 
+                value={inputServiceKey}
+                onChange={(e) => setInputServiceKey(e.target.value)}
               />
             </div>
 

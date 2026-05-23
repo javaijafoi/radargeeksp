@@ -1,50 +1,13 @@
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
+// Vercel Serverless Function to trigger scraping and save to Supabase
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
-// Emulação de __dirname em ES Modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Carregar arquivo .env local do frontend se existir (Zero-dependency .env reader)
-try {
-  const envPath = path.join(__dirname, '..', 'web', '.env')
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf-8')
-    envContent.split('\n').forEach(line => {
-      if (line.trim().startsWith('#') || !line.trim()) return
-      const parts = line.split('=')
-      if (parts.length >= 2) {
-        const key = parts[0].trim()
-        const value = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '')
-        if (key && value && !process.env[key]) {
-          process.env[key] = value
-        }
-      }
-    })
-  }
-} catch (e) {
-  // Ignora erros ao carregar .env
-}
-
-// Variáveis de ambiente
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://MOCK.supabase.co"
-const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "MOCK_KEY"
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "MOCK_GEMINI_KEY"
-
-// Listas locais de persistência para o data.json
-const todosLocais = []
-const todosEventos = []
-const todosLogs = []
-
-// Logs acumulados durante a execução para salvar na tabela historico_scraping
 let executionLogs = []
 function logMessage(msg) {
-  console.log(msg)
   executionLogs.push(`[${new Date().toISOString()}] ${msg}`)
 }
 
-// Heurísticas locais se não houver Gemini API Key
 function heuristicaLocalEvento(descricao) {
   const descLower = descricao.toLowerCase()
   let score = 7
@@ -73,10 +36,9 @@ function heuristicaLocalEvento(descricao) {
   }
 }
 
-// Avaliação via Gemini API
 async function avaliarEventoGemini(descricaoEvento) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("MOCK")) {
-    logMessage("Usando avaliação heurística local (Gemini API Key ausente)...")
+  if (!GEMINI_API_KEY) {
+    logMessage("Usando avaliação heurística local (Gemini API Key ausente no servidor)...")
     return heuristicaLocalEvento(descricaoEvento)
   }
 
@@ -107,8 +69,6 @@ async function avaliarEventoGemini(descricaoEvento) {
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
     const resJson = await res.json()
     let resultText = resJson.candidates[0].content.parts[0].text
-    
-    // Limpar blocos markdown
     resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim()
     return JSON.parse(resultText)
   } catch (e) {
@@ -117,26 +77,10 @@ async function avaliarEventoGemini(descricaoEvento) {
   }
 }
 
-// Inserção Supabase REST / Mock
 async function inserirSupabase(tabela, dados) {
-  if (SUPABASE_URL.includes("MOCK") || !SUPABASE_URL) {
-    const dadosSalvos = { ...dados, id: crypto.randomUUID() }
-    
-    if (tabela === "locais_fixos") {
-      todosLocais.push(dadosSalvos)
-    } else if (tabela === "eventos") {
-      const eventoComRelacao = { ...dadosSalvos }
-      if (dadosSalvos.local_id) {
-        const local = todosLocais.find(l => l.id === dadosSalvos.local_id)
-        if (local) eventoComRelacao.locais_fixos = local
-      }
-      todosEventos.push(eventoComRelacao)
-    } else if (tabela === "historico_scraping") {
-      todosLogs.push(dadosSalvos)
-    }
-    
-    logMessage(`[MOCK] Registro na tabela '${tabela}': ${tabela === 'locais_fixos' ? dadosSalvos.nome : (tabela === 'eventos' ? dadosSalvos.titulo : 'log')}`)
-    return [dadosSalvos]
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    logMessage(`[ERRO] Credenciais do Supabase ausentes no Vercel.`);
+    return null
   }
 
   const url = `${SUPABASE_URL}/rest/v1/${tabela}`
@@ -160,33 +104,29 @@ async function inserirSupabase(tabela, dados) {
       return null
     }
 
-    const resJson = await response.json()
-    if (resJson && resJson.length > 0) {
-      const item = resJson[0]
-      if (tabela === "locais_fixos") {
-        todosLocais.push(item)
-      } else if (tabela === "eventos") {
-        const eventoComRelacao = { ...item }
-        if (item.local_id) {
-          const local = todosLocais.find(l => l.id === item.local_id)
-          if (local) eventoComRelacao.locais_fixos = local
-        }
-        todosEventos.push(eventoComRelacao)
-      } else if (tabela === "historico_scraping") {
-        todosLogs.push(item)
-      }
-      return resJson
-    }
-    return null
+    return await response.json()
   } catch (e) {
     logMessage(`Exceção ao inserir no Supabase: ${e.message}`)
     return null
   }
 }
 
-async function main() {
-  logMessage("Iniciando rotina de scraping do Radar Geek SP...")
+export default async function handler(req, res) {
+  // Apenas aceita requisições POST para evitar acionamentos acidentais por GET
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' })
+  }
+
+  executionLogs = []
+  logMessage("Iniciando rotina de scraping do Radar Geek SP na Nuvem (Vercel)...")
   
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return res.status(500).json({ 
+      sucesso: false, 
+      logs: "Erro: SUPABASE_URL ou SUPABASE_KEY não configurados nas variáveis de ambiente da Vercel."
+    })
+  }
+
   const locaisExemplo = [
     {
       nome: "Taverna Medieval",
@@ -237,7 +177,7 @@ async function main() {
   let locaisProcessadosCount = 0
   for (const local of locaisExemplo) {
     const resultado = await inserirSupabase("locais_fixos", local)
-    if (resultado) {
+    if (resultado && resultado.length > 0) {
       locaisIds[local.nome] = resultado[0].id
       locaisProcessadosCount++
     }
@@ -246,67 +186,31 @@ async function main() {
   const eventosCrus = [
     {
       titulo: "Mega Encontro de RPG",
-      descricao: "Uma noite focada em campanhas curtas (one-shots) de Dungeons & Dragons e Call of Cthulhu para mestres e jogadores de todos os níveis. Comidas e poções sem lactose inclusas.",
+      descricao: "Campanhas rápidas de D&D e RPG para mestres e iniciantes. Poções mágicas sem lactose liberadas.",
       data_hora: new Date().toISOString(),
       local_nome: "Taverna Medieval",
       imagem_flyer_path: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600"
     },
     {
       titulo: "Campeonato de Catan e Hambúrguer Vegano",
-      descricao: "Venha competir no clássico Colonizadores de Catan! O torneio garante premiação oficial e um hambúrguer 100% plant-based para todos os participantes inscritos.",
+      descricao: "Desafio cooperativo e competitivo no tabuleiro clássico Catan, regado a lanches plant-based.",
       data_hora: new Date(Date.now() + 86400000).toISOString(),
       local_nome: "Ludoteria SP",
       imagem_flyer_path: "https://images.unsplash.com/photo-1585504198199-20277593b94f?q=80&w=600"
     },
     {
       titulo: "Torneio de Smash Bros & Café Express",
-      descricao: "Campeonato presencial de Super Smash Bros Ultimate com premiação em dinheiro para os 3 primeiros colocados. Inscrições abertas no balcão da cafeteria.",
+      descricao: "Mostre sua habilidade no controle em Smash Bros Ultimate e ganhe prêmios em dinheiro e cafés especiais.",
       data_hora: new Date(Date.now() + 172800000).toISOString(),
       local_nome: "Coffee & Games",
       imagem_flyer_path: "https://images.unsplash.com/photo-1551103782-8ab07afd45c1?q=80&w=600"
-    },
-    {
-      titulo: "Friday Night Magic (Draft)",
-      descricao: "O tradicional torneio semanal de Magic: The Gathering! Formato Draft com a última coleção lançada. Ótima oportunidade de conseguir cartas raras e pontos na liga.",
-      data_hora: new Date(Date.now() + 43200000).toISOString(),
-      local_nome: "Epic Games & RPG",
-      imagem_flyer_path: "https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?q=80&w=600"
-    },
-    {
-      titulo: "Karaokê & Cosplay Pop-Art",
-      descricao: "Cante suas trilhas de anime e rock favoritas fantasiado do seu personagem predileto. Os melhores cosplays da noite ganharão vouchers de consumo de drinks do bar.",
-      data_hora: new Date(Date.now() + 259200000).toISOString(),
-      local_nome: "Gibi Cultura Geek",
-      imagem_flyer_path: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=600"
-    },
-    {
-      titulo: "Tarde de Desenho & Anime Quiz",
-      descricao: "Reunião de artistas ilustradores locais com jogos de perguntas e respostas rápidos sobre animes clássicos da TV Manchete e novos sucessos do Crunchyroll.",
-      data_hora: new Date(Date.now() + 345600000).toISOString(),
-      local_nome: "Anime Café SP",
-      imagem_flyer_path: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600"
-    },
-    {
-      titulo: "Grande Convenção Anime & Comic Fest",
-      descricao: "Maior evento geek de rua do bairro, com praça de alimentação temática, stands de lojas independentes, palestras e desfiles de cosplays. Entrada franca.",
-      data_hora: new Date(Date.now() + 100000000).toISOString(),
-      local_nome: null,
-      imagem_flyer_path: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=600"
-    },
-    {
-      titulo: "Feira Geek de Calçadão",
-      descricao: "Grande aglomeração com stands vendendo colecionáveis de procedência duvidosa no sol, cerveja quente de latão e tumulto excessivo. Indicado apenas se você quiser passar calor.",
-      data_hora: new Date(Date.now() + 500000000).toISOString(),
-      local_nome: null,
-      imagem_flyer_path: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=600"
     }
   ]
 
-  logMessage(`\nProcessando ${eventosCrus.length} eventos coletados...`);
+  logMessage(`Processando ${eventosCrus.length} eventos coletados...`);
   let eventosNovosCount = 0
   for (const evento of eventosCrus) {
     const avaliacao = await avaliarEventoGemini(evento.descricao)
-    
     const novoEvento = {
       titulo: evento.titulo,
       descricao: evento.descricao,
@@ -324,7 +228,7 @@ async function main() {
     if (res) eventosNovosCount++
   }
 
-  logMessage("\nRegistrando log de execução...");
+  logMessage("Salvando log no histórico de auditoria...");
   const logDados = {
     executado_em: new Date().toISOString(),
     sucesso: true,
@@ -334,28 +238,10 @@ async function main() {
   }
   await inserirSupabase("historico_scraping", logDados)
 
-  // Exportar para o data.json
-  try {
-    const webPublicDir = path.join(__dirname, "..", "web", "public")
-    if (!fs.existsSync(webPublicDir)) {
-      fs.mkdirSync(webPublicDir, { recursive: true })
-    }
-    const jsonPath = path.join(webPublicDir, "data.json")
-
-    const dadosExportados = {
-      locais: todosLocais,
-      eventos: todosEventos,
-      logs: todosLogs,
-      exportado_em: new Date().toISOString()
-    }
-
-    fs.writeFileSync(jsonPath, JSON.stringify(dadosExportados, null, 2), 'utf-8')
-    logMessage(`\n[Vite Sync] Dados offline salvos com sucesso para: ${jsonPath}`)
-  } catch (e) {
-    logMessage(`Erro ao salvar arquivo JSON local: ${e.message}`)
-  }
-
-  logMessage("\nRotina concluída com sucesso!")
+  res.status(200).json({
+    sucesso: true,
+    locais_processados: locaisProcessadosCount,
+    eventos_novos: eventosNovosCount,
+    logs: executionLogs.join('\n')
+  })
 }
-
-main()

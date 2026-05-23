@@ -2,18 +2,25 @@ import { createClient } from '@supabase/supabase-js'
 
 let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('radar_supabase_url') || ''
 let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('radar_supabase_anon_key') || ''
+let supabaseServiceKey = localStorage.getItem('radar_supabase_service_key') || ''
 
 export function getSupabaseConfig() {
   return {
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
-    isConfigured: !!(supabaseUrl && supabaseAnonKey)
+    serviceKey: supabaseServiceKey,
+    isConfigured: !!(supabaseUrl && supabaseAnonKey),
+    isAdmin: !!(supabaseUrl && supabaseServiceKey)
   }
 }
 
-export function saveSupabaseConfig(url, anonKey) {
+export function saveSupabaseConfig(url, anonKey, serviceKey = '') {
   localStorage.setItem('radar_supabase_url', url)
   localStorage.setItem('radar_supabase_anon_key', anonKey)
+  if (serviceKey) {
+    localStorage.setItem('radar_supabase_service_key', serviceKey)
+    supabaseServiceKey = serviceKey
+  }
   supabaseUrl = url
   supabaseAnonKey = anonKey
   if (url && anonKey) {
@@ -26,11 +33,23 @@ export function saveSupabaseConfig(url, anonKey) {
 export function clearSupabaseConfig() {
   localStorage.removeItem('radar_supabase_url')
   localStorage.removeItem('radar_supabase_anon_key')
+  localStorage.removeItem('radar_supabase_service_key')
   supabaseUrl = ''
   supabaseAnonKey = ''
+  supabaseServiceKey = ''
   supabase = null
+}
+
+export function getSupabaseAdminClient() {
+  if (supabaseUrl && supabaseServiceKey) {
+    return createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    })
+  }
+  return null
 }
 
 export let supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null
+

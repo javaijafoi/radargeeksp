@@ -22,7 +22,7 @@ def avaliar_evento_gemini(descricao_evento):
         print("Usando avaliação heurística local (Gemini API Key ausente)...")
         return heuristica_local_evento(descricao_evento)
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     Avalie o seguinte evento geek:
