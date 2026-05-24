@@ -71,7 +71,7 @@ async function queryTavilySearch(query) {
       query: query,
       search_depth: 'basic',
       include_raw_content: true,
-      max_results: 30
+      max_results: 10
     })
   });
   if (!res.ok) throw new Error(`Tavily retornou status ${res.status}`);
