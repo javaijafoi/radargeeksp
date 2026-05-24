@@ -1,0 +1,104 @@
+{
+  "locais": [
+    {
+      "id": "786be665-d1d6-4b79-8878-41ae2b57a133",
+      "nome": "Bodogami - Restaurante e Jogos de Tabuleiro",
+      "descricao": "Um charmoso restaurante e ludoteria localizado no bairro da Liberdade. Oferece uma experiência única onde você pode desfrutar de culinária oriental e drinks temáticos enquanto joga em seu vasto acervo de board games. Há um couvert lúdico para acesso aos jogos.",
+      "tags_consumo": [
+        "comida-oriental",
+        "drinks",
+        "jogos-de-tabuleiro",
+        "cafe",
+        "cerveja-artesanal",
+        "sobremesas"
+      ],
+      "distancia_mooca": 25,
+      "imagem_hero_path": "https://images.unsplash.com/photo-1595013000627-8a60a8b1b5e5?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    },
+    {
+      "id": "bc16ba54-b8f2-4f3a-b8da-6e4b06f6ee13",
+      "nome": "Ludus Luderia",
+      "descricao": "Considerada uma das pioneiras e maiores ludoterias de São Paulo, a Ludus Luderia, na Vila Mariana, possui um acervo impressionante com mais de 1.200 jogos de tabuleiro. Com o valor da entrada, você joga à vontade, e há opções de comidas e bebidas para acompanhar.",
+      "tags_consumo": [
+        "jogos-de-tabuleiro",
+        "lanches",
+        "refrigerantes",
+        "cerveja",
+        "cafe",
+        "diversao-em-grupo",
+        "petiscos"
+      ],
+      "distancia_mooca": 35,
+      "imagem_hero_path": "https://images.unsplash.com/photo-1604085792762-a5d4303b7457?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    },
+    {
+      "id": "9e1586af-acc5-41c5-a071-ce4123ce5d09",
+      "nome": "Encounter Board Game Café",
+      "descricao": "Um ambiente acolhedor em Pinheiros, focado em jogos de tabuleiro modernos e sessões de RPG. É o lugar perfeito para marcar encontros com amigos e família, mergulhar em novas aventuras e desfrutar de um bom café e lanches.",
+      "tags_consumo": [
+        "jogos-de-tabuleiro",
+        "rpg",
+        "cafe",
+        "lanches",
+        "cerveja-artesanal",
+        "eventos-tematicos",
+        "doces"
+      ],
+      "distancia_mooca": 40,
+      "imagem_hero_path": "https://images.unsplash.com/photo-1542838687-353d91782e4e?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    }
+  ],
+  "eventos": [
+    {
+      "id": "a0b98957-40f8-4f2e-b79d-1b84b8c6d2ba",
+      "local_id": null,
+      "titulo": "CCXP26",
+      "descricao": "O maior festival de cultura pop do mundo retorna ao São Paulo Expo, prometendo quatro dias de imersão total. Espere painéis com grandes nomes da indústria, pré-estreias exclusivas, stands de estúdios, concursos de cosplay e a presença de quadrinistas renomados. É o evento definitivo para fãs de cinema, séries, games e quadrinhos.",
+      "data_hora": "2026-12-03T13:00:00+00:00",
+      "ia_score_cilada": 6,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://images.unsplash.com/photo-1560662993-4a15a81816f0?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    },
+    {
+      "id": "243723db-4915-4af2-85c1-5c041d5e2a5f",
+      "local_id": null,
+      "titulo": "Orgulho Nerd SP 2026",
+      "descricao": "Celebre o mês do Orgulho Nerd no Memorial da América Latina. Este evento anual traz uma programação diversificada com palestras, workshops, feira de produtos geek, concursos de cosplay e áreas dedicadas a games, animes e quadrinhos. Ideal para toda a família e fãs da cultura pop em geral.",
+      "data_hora": "2026-03-28T13:00:00+00:00",
+      "ia_score_cilada": 8,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://images.unsplash.com/photo-1549727572-c0e6e7d6b3c2?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    },
+    {
+      "id": "0e78b436-af01-484a-bfaf-a1ed65c11447",
+      "local_id": null,
+      "titulo": "Multiverso Geek 2026",
+      "descricao": "Um festival vibrante que explora os diversos universos da cultura geek, desde animes e mangás a games, super-heróis e ficção científica. O evento contará com expositores, artistas independentes, painéis de discussão e áreas interativas para fãs de todas as idades.",
+      "data_hora": "2026-07-19T14:00:00+00:00",
+      "ia_score_cilada": 7,
+      "kid_friendly": true,
+      "imagem_flyer_path": "https://images.unsplash.com/photo-1621980894563-718e26c6d03d?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    },
+    {
+      "id": "e1515594-52f5-4ad7-a15a-9d50279b0afe",
+      "local_id": "bc16ba54-b8f2-4f3a-b8da-6e4b06f6ee13",
+      "titulo": "Noite de RPG na Ludus Luderia",
+      "descricao": "Prepare-se para uma aventura épica! A Ludus Luderia organiza noites temáticas de RPG, onde mestres experientes guiam jogadores por mundos fantásticos. Ideal para quem quer aprender a jogar, encontrar um novo grupo ou simplesmente mergulhar em uma boa história.",
+      "data_hora": "2026-06-15T22:00:00+00:00",
+      "ia_score_cilada": 9,
+      "kid_friendly": false,
+      "imagem_flyer_path": "https://images.unsplash.com/photo-1563207153-f40b29a2a7a4?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    }
+  ],
+  "logs": [
+    {
+      "id": "5e979dc9-c147-4a79-a42e-09cb8634ffc7",
+      "executado_em": "2026-05-23T19:29:38.075+00:00",
+      "sucesso": true,
+      "locais_processados": 3,
+      "eventos_novos": 4,
+      "logs": "[2026-05-23T19:29:03.833Z] Iniciando rotina de scraping local do Radar Geek SP... (Memória Inicial: 50.33 MB)\n[2026-05-23T19:29:03.834Z] ⚙️ Carregando configurações de scraping do banco de dados...\n[2026-05-23T19:29:04.299Z] \n🔍 Buscando na web por: \"eventos geek nerd sao paulo 2026\"...\n[2026-05-23T19:29:05.161Z] ✅ DuckDuckGo Lite retornou 3500 caracteres para \"eventos geek nerd sao paulo 2026\".\n[2026-05-23T19:29:06.168Z] \n🔍 Buscando na web por: \"ludoteria board game cafe sao paulo\"...\n[2026-05-23T19:29:07.248Z] ✅ DuckDuckGo Lite retornou 3500 caracteres para \"ludoteria board game cafe sao paulo\".\n[2026-05-23T19:29:08.253Z] \n🔍 Buscando na web por: \"rpg de mesa encontro sao paulo\"...\n[2026-05-23T19:29:08.360Z] ✅ DuckDuckGo Lite retornou 328 caracteres para \"rpg de mesa encontro sao paulo\".\n[2026-05-23T19:29:09.366Z] \n🔍 Buscando na web por: \"hamburgueria tematica nerd geek sp\"...\n[2026-05-23T19:29:09.466Z] ✅ DuckDuckGo Lite retornou 328 caracteres para \"hamburgueria tematica nerd geek sp\".\n[2026-05-23T19:29:10.468Z] \n🔍 Buscando na web por: \"feira geek comic con sao paulo 2026\"...\n[2026-05-23T19:29:10.602Z] ✅ DuckDuckGo Lite retornou 328 caracteres para \"feira geek comic con sao paulo 2026\".\n[2026-05-23T19:29:11.615Z] \n🧠 Enviando fragmentos de busca para a Inteligência Artificial (Gemini) processar...\n[2026-05-23T19:29:36.204Z] ✅ Dados extraídos e estruturados pela IA com sucesso.\n[2026-05-23T19:29:36.204Z] \n💾 Sincronizando 3 locais fixos identificados...\n[2026-05-23T19:29:37.247Z] 💾 Sincronizando 4 eventos sazonais identificados...\n[2026-05-23T19:29:38.075Z] \n🎉 Scraping concluído em 34.24s. 3 locais e 4 eventos inseridos.\n[2026-05-23T19:29:38.075Z] 📊 Consumo de Memória (RSS): Inicial: 50.33 MB -> Final: 63.71 MB (Delta: 13.39 MB)"
+    }
+  ],
+  "exportado_em": "2026-05-23T19:29:38.298Z"
+}

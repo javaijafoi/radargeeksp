@@ -13,6 +13,7 @@ CREATE TABLE locais_fixos (
     descricao TEXT,
     tags_consumo TEXT[] DEFAULT '{}',
     distancia_mooca INTEGER NOT NULL,
+    bairro TEXT,
     imagem_hero_path TEXT
 );
 
@@ -25,6 +26,7 @@ CREATE TABLE eventos (
     data_hora TIMESTAMP WITH TIME ZONE NOT NULL,
     ia_score_cilada INTEGER CHECK (ia_score_cilada >= 1 AND ia_score_cilada <= 10),
     kid_friendly BOOLEAN DEFAULT false,
+    bairro TEXT,
     imagem_flyer_path TEXT
 );
 
@@ -52,3 +54,35 @@ CREATE POLICY "Leitura pública eventos" ON eventos FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Leitura pública historico_scraping" ON historico_scraping;
 CREATE POLICY "Leitura pública historico_scraping" ON historico_scraping FOR SELECT USING (true);
+
+-- 4. Tabela de Configurações do Scraper
+CREATE TABLE IF NOT EXISTS scraper_config (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    search_queries JSONB DEFAULT '["eventos geek são paulo final de semana", "rpg de mesa sp", "hamburgueria tematica nerd sp"]'::jsonb,
+    gemini_prompt TEXT DEFAULT 'Você é um robô extrator de dados. Analise os seguintes resultados de busca (URLs, Títulos e Trechos).
+Extraia os eventos geek e os locais geek de São Paulo que encontrar. 
+Crie datas e horários realistas baseados nos próximos dias para os eventos se não houver data exata.
+Invente (ou infira) as imagens baseadas em URLs do Unsplash (ex: https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=600).
+
+Retorne APENAS um JSON válido com esta estrutura:
+{
+  "locais": [
+    {"nome": "Nome do Local", "descricao": "Breve info", "tags_consumo": ["tag1", "tag2"], "distancia_mooca": 20, "bairro": "Nome do Bairro", "imagem_hero_path": "url"}
+  ],
+  "eventos": [
+    {"titulo": "Nome", "descricao": "Breve info", "data_hora": "YYYY-MM-DDTHH:MM:SSZ", "ia_score_cilada": 7, "kid_friendly": false, "bairro": "Nome do Bairro", "imagem_flyer_path": "url", "local_nome": "Nome do Local"}
+  ]
+}'
+);
+
+ALTER TABLE scraper_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura pública scraper_config" ON scraper_config;
+CREATE POLICY "Leitura pública scraper_config" ON scraper_config FOR SELECT USING (true);
+
+-- Permite update para usuários autenticados via Supabase Auth
+DROP POLICY IF EXISTS "Update scraper_config" ON scraper_config;
+CREATE POLICY "Update scraper_config" ON scraper_config FOR UPDATE USING (auth.role() = 'authenticated');
+
+INSERT INTO scraper_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+

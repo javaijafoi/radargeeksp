@@ -16,19 +16,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation3.runtime.NavKey
 import coil.compose.AsyncImage
 import com.example.radargeeksp.LocalDetail
-import com.example.radargeeksp.data.DefaultDataRepository
-import com.example.radargeeksp.data.Evento
-import com.example.radargeeksp.data.LocalFixo
+import com.example.radargeeksp.data.SupabaseDataRepository
+import com.example.radargeeksp.data.GeekEvento
+import com.example.radargeeksp.data.GeekLocal
 
 @Composable
 fun MainScreen(
     onItemClick: (NavKey) -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(DefaultDataRepository()) },
+    modifier: Modifier = Modifier
 ) {
+    val repository = remember { SupabaseDataRepository() }
+
+    val viewModel: MainScreenViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return MainScreenViewModel(repository) as T
+            }
+        }
+    )
+
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(0) }
 
@@ -36,12 +47,12 @@ fun MainScreen(
         Text(
             text = "Radar Geek SP",
             style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp)
         )
 
         TabRow(selectedTabIndex = selectedTab) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text("Eventos da Semana", modifier = Modifier.padding(16.dp))
+                Text("Eventos", modifier = Modifier.padding(16.dp))
             }
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
                 Text("Lugares Fixos", modifier = Modifier.padding(16.dp))
@@ -57,21 +68,21 @@ fun MainScreen(
                 }
             }
             is MainScreenUiState.Error -> {
-                Text("Erro ao carregar dados: ${uiState.throwable.message}", color = MaterialTheme.colorScheme.error)
+                Text("Erro ao carregar dados: ${uiState.throwable.message}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
             }
             is MainScreenUiState.Success -> {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     if (selectedTab == 0) {
-                        items(uiState.eventos) { evento ->
-                            EventCard(evento, onClickLocal = { localId -> 
+                        items(uiState.data.eventos) { evento ->
+                            EventCard(evento, locais = uiState.data.locais, onClickLocal = { localId -> 
                                 onItemClick(LocalDetail(localId)) 
                             })
                         }
                     } else {
-                        items(uiState.locaisFixos) { local ->
+                        items(uiState.data.locais) { local ->
                             LocalCard(local, onClick = { 
                                 onItemClick(LocalDetail(local.id)) 
                             })
@@ -84,9 +95,22 @@ fun MainScreen(
 }
 
 @Composable
-fun EventCard(evento: Evento, onClickLocal: (String) -> Unit) {
+fun EventCard(evento: GeekEvento, locais: List<GeekLocal>, onClickLocal: (String) -> Unit) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val clickableModifier = if (!evento.fonteUrl.isNullOrBlank()) {
+        Modifier.clickable {
+            try {
+                uriHandler.openUri(evento.fonteUrl)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    } else {
+        Modifier
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(clickableModifier),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
@@ -104,16 +128,36 @@ fun EventCard(evento: Evento, onClickLocal: (String) -> Unit) {
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(text = evento.titulo, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                
+                if (!evento.endereco.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "📍 Endereço: ${evento.endereco}", style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (!evento.precoEntrada.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "💵 Preço: ${evento.precoEntrada}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "Data: ${evento.dataHora}", style = MaterialTheme.typography.bodyMedium)
                 
+                if (evento.descricao.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = evento.descricao, style = MaterialTheme.typography.bodySmall)
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     AssistChip(
                         onClick = { },
-                        label = { Text("Nota IA: ${evento.iaScoreCilada ?: "?"}/10") },
+                        label = { Text("Nota IA: ${evento.iaScoreCilada}/10") },
                         colors = AssistChipDefaults.assistChipColors(
-                            containerColor = if ((evento.iaScoreCilada ?: 0) >= 7) Color(0xFF4CAF50) else Color(0xFFFF9800),
+                            containerColor = if (evento.iaScoreCilada >= 7) Color(0xFF4CAF50) else Color(0xFFFF9800),
                             labelColor = Color.White
                         ),
                         border = null
@@ -127,14 +171,46 @@ fun EventCard(evento: Evento, onClickLocal: (String) -> Unit) {
                         )
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val badgeColor = if (evento.iaInferido) Color(0xFF9C27B0) else Color(0xFF009688)
+                    val badgeText = if (evento.iaInferido) "🤖 IA (Inferido)" else "🌐 Real (Extraído)"
+                    AssistChip(
+                        onClick = { },
+                        label = { Text(badgeText) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = badgeColor, labelColor = Color.White),
+                        border = null
+                    )
+                    
+                    if (!evento.fonteUrl.isNullOrBlank()) {
+                        AssistChip(
+                            onClick = {
+                                try {
+                                    uriHandler.openUri(evento.fonteUrl)
+                                } catch (e: Exception) {}
+                            },
+                            label = { Text("🔗 Ver Link") },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = Color.DarkGray, labelColor = Color.White),
+                            border = null
+                        )
+                    }
+                }
 
-                if (evento.localId != null && evento.local != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(
-                        onClick = { onClickLocal(evento.localId) },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("📍 Acontece na base: ${evento.local.nome}")
+                if (evento.localId != null) {
+                    val localEncontrado = locais.find { it.id == evento.localId }
+                    if (localEncontrado != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = { onClickLocal(evento.localId) },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("📍 Acontece na base: ${localEncontrado.nome}")
+                        }
                     }
                 }
             }
@@ -143,7 +219,9 @@ fun EventCard(evento: Evento, onClickLocal: (String) -> Unit) {
 }
 
 @Composable
-fun LocalCard(local: LocalFixo, onClick: () -> Unit) {
+fun LocalCard(local: GeekLocal, onClick: () -> Unit) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -153,8 +231,49 @@ fun LocalCard(local: LocalFixo, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = local.nome, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                
+                if (!local.endereco.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = "📍 ${local.endereco}", style = MaterialTheme.typography.bodySmall)
+                }
+                
+                if (!local.precoMedio.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = "💵 Preço Médio: ${local.precoMedio}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(text = "A ${local.distanciaMooca} min da Mooca", style = MaterialTheme.typography.bodyMedium)
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val badgeColor = if (local.iaInferido) Color(0xFF9C27B0) else Color(0xFF009688)
+                    val badgeText = if (local.iaInferido) "🤖 IA" else "🌐 Real"
+                    Text(
+                        text = badgeText,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = badgeColor
+                    )
+                    
+                    if (!local.fonteUrl.isNullOrBlank()) {
+                        Text(
+                            text = "🔗 Site",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                try {
+                                    uriHandler.openUri(local.fonteUrl)
+                                } catch (e: Exception) {}
+                            }
+                        )
+                    }
+                }
+                
                 if (local.tagsConsumo.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(text = local.tagsConsumo.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
             }

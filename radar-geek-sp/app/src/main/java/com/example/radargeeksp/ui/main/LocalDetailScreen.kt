@@ -8,28 +8,30 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.radargeeksp.data.Evento
-import com.example.radargeeksp.data.LocalFixo
-import com.example.radargeeksp.data.SupabaseClient
+import com.example.radargeeksp.data.SupabaseDataRepository
+import com.example.radargeeksp.data.GeekEvento
+import com.example.radargeeksp.data.GeekLocal
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocalDetailScreen(localId: String, onBack: () -> Unit) {
-    var local by remember { mutableStateOf<LocalFixo?>(null) }
-    var eventos by remember { mutableStateOf<List<Evento>>(emptyList()) }
+    val repository = remember { SupabaseDataRepository() }
+    
+    var local by remember { mutableStateOf<GeekLocal?>(null) }
+    var eventos by remember { mutableStateOf<List<GeekEvento>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(localId) {
         try {
-            // Busca o local específico filtrando na lista localmente ou via API. 
-            // Para manter simples no demo, pegamos todos e filtramos.
-            val locais = SupabaseClient.getLocaisFixos()
-            local = locais.find { it.id == localId }
-            eventos = SupabaseClient.getEventosDoLocal(localId)
+            val data = repository.geekData.first()
+            local = data.locais.find { it.id == localId }
+            eventos = data.eventos.filter { it.localId == localId }
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
@@ -73,9 +75,52 @@ fun LocalDetailScreen(localId: String, onBack: () -> Unit) {
                 }
 
                 Column(modifier = Modifier.padding(16.dp)) {
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
                     Text(text = localFixo.nome, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
+                    
+                    if (localFixo.descricao.isNotBlank()) {
+                        Text(text = localFixo.descricao, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    
+                    if (!localFixo.endereco.isNullOrBlank()) {
+                        Text(text = "📍 Endereço: ${localFixo.endereco}", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    
+                    if (!localFixo.precoMedio.isNullOrBlank()) {
+                        Text(text = "💵 Preço Médio: ${localFixo.precoMedio}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
                     Text(text = "Tempo da Mooca: ${localFixo.distanciaMooca} minutos", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val badgeColor = if (localFixo.iaInferido) Color(0xFF9C27B0) else Color(0xFF009688)
+                        val badgeText = if (localFixo.iaInferido) "🤖 IA (Inferido)" else "🌐 Real (Extraído)"
+                        AssistChip(
+                            onClick = { },
+                            label = { Text(badgeText) },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = badgeColor, labelColor = Color.White),
+                            border = null
+                        )
+                        
+                        if (!localFixo.fonteUrl.isNullOrBlank()) {
+                            AssistChip(
+                                onClick = {
+                                    try {
+                                        uriHandler.openUri(localFixo.fonteUrl)
+                                    } catch (e: Exception) {}
+                                },
+                                label = { Text("🔗 Acessar Site") },
+                                colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.primary, labelColor = Color.White),
+                                border = null
+                            )
+                        }
+                    }
                     
                     if (localFixo.tagsConsumo.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -102,7 +147,7 @@ fun LocalDetailScreen(localId: String, onBack: () -> Unit) {
                         ) {
                             items(eventos) { evento ->
                                 Box(modifier = Modifier.width(280.dp)) {
-                                    EventCard(evento = evento, onClickLocal = { })
+                                    EventCard(evento = evento, locais = listOf(localFixo), onClickLocal = { })
                                 }
                             }
                         }

@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "scrape": "node ../backend/scraper.js"
+    "scrape": "node ../backend/scraper.js",
+    "enrich": "node ../backend/enrich_events.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.5",
+    "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
