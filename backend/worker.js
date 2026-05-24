@@ -157,30 +157,47 @@ async function isQuotaError(msg) {
   return lower.includes('429') || lower.includes('quota') || lower.includes('resource_exhausted') || lower.includes('503');
 }
 
+async function extrairComGroq(prompt) {
+  if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY ausente.');
+  const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
+
+  // 1º tenta o modelo 70B (mais inteligente)
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }]
+    });
+    return parseJsonResp(completion.choices[0].message.content);
+  } catch (err) {
+    if (await isQuotaError(err.message)) {
+      logMessage(`⚠️ Groq 70B no limite. Tentando modelo 8B rápido...`);
+      // 2º fallback: modelo menor e mais rápido
+      const fallback = await openai.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }]
+      });
+      return parseJsonResp(fallback.choices[0].message.content);
+    }
+    throw err;
+  }
+}
+
+// Usado no scrape e process-queue: Groq primário, Gemini de reserva
 async function extrairComGemini(promptBase, item) {
   const textoFontes = `\n--- FONTE 1: ${item.titulo || item.url} ---\nFONTE URL: ${item.url}\nDESCRIÇÃO: ${item.descricao}\nCONTEUDO:\n${item.conteudo_texto}`;
   const imagensInfo = item.og_image ? `\n\n🖼️ IMAGEM REAL DA PÁGINA: ${item.og_image}` : '\n\n[Sem imagens reais — use Unsplash]';
   const prompt = `${promptBase}${imagensInfo}\n\nFONTES:\n${textoFontes}`;
 
   try {
-    if (!GEMINI_API_KEY) throw new Error('Gemini API Key não configurada.');
+    logMessage(`  ⚡ Processando com Groq...`);
+    return await extrairComGroq(prompt);
+  } catch (err) {
+    logMessage(`  ⚠️ Groq falhou (${err.message.substring(0, 60)}). Tentando Gemini como reserva...`);
+    if (!GEMINI_API_KEY) throw new Error('Groq e Gemini indisponíveis.');
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    return parseJsonResp(text);
-  } catch (err) {
-    if (await isQuotaError(err.message)) {
-      logMessage(`⚠️ Limite do Gemini atingido. Acionando Fallback Groq (llama-3.3-70b-versatile)...`);
-      if (!GROQ_API_KEY) throw new Error("Cota Gemini excedida e GROQ_API_KEY ausente.");
-      const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
-      const completion = await openai.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }]
-      });
-      return parseJsonResp(completion.choices[0].message.content);
-    }
-    throw err;
+    return parseJsonResp(result.response.text());
   }
 }
 
@@ -347,21 +364,18 @@ async function webSearchSnippets(query) {
   } catch (e) { return ""; }
 }
 
+// Usado no maintenance: Gemini primário (melhor raciocínio), Groq de reserva
 async function callGemini(promptText) {
   try {
+    if (!GEMINI_API_KEY) throw new Error('Gemini API Key não configurada.');
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(promptText);
     return parseJsonResp(result.response.text());
   } catch (err) {
     if (await isQuotaError(err.message)) {
-      logMessage(`⚠️ Fallback Groq acionado na Manutenção...`);
-      const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
-      const completion = await openai.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: promptText }]
-      });
-      return parseJsonResp(completion.choices[0].message.content);
+      logMessage(`⚠️ Gemini no limite na Manutenção. Fallback Groq...`);
+      return await extrairComGroq(promptText);
     }
     throw err;
   }
