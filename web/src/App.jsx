@@ -740,6 +740,13 @@ export default function App() {
                             <MapPin size={12} /> {evento.locais_fixos.nome}
                           </a>
                         )}
+
+                        {evento.atualizado_em && (
+                          <div style={{ marginTop: '0.8rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            <RefreshCw size={10} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                            Atualizado em: {new Date(evento.atualizado_em).toLocaleDateString('pt-BR')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -815,6 +822,12 @@ export default function App() {
                           <span key={idx} className={`tag-badge ${tag.toLowerCase().includes('vegan') || tag.toLowerCase().includes('lactose') ? 'tag-badge-accent' : ''}`}>{tag}</span>
                         ))}
                       </div>
+                      {local.atualizado_em && (
+                        <div style={{ marginTop: '0.8rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          <RefreshCw size={10} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                          Atualizado em: {new Date(local.atualizado_em).toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -907,6 +920,16 @@ export default function App() {
                                     {ev.endereco}
                                   </div>
                                 )}
+                                <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem' }}>
+                                  {ev.bairro && <span className="tag-badge"><MapPin size={10} style={{ marginRight: '2px', display: 'inline' }} />{ev.bairro}</span>}
+                                  {ev.kid_friendly && <span className="tag-badge tag-badge-accent">Kids Ok</span>}
+                                </div>
+                                {ev.atualizado_em && (
+                                  <div style={{ marginTop: '0.8rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                    <RefreshCw size={10} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                                    Atualizado em: {new Date(ev.atualizado_em).toLocaleDateString('pt-BR')}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -995,6 +1018,9 @@ export default function App() {
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
                       <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--accent-tertiary)' }} /> <strong>Imagens:</strong> 02:00 BRT (Nuvem)
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
+                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: '#fff' }} /> <strong>Limpeza/Enriquecimento:</strong> 03:00 BRT (Nuvem)
                     </span>
                   </div>
                 </div>

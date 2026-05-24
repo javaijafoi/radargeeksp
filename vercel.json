@@ -11,6 +11,10 @@
     {
       "path": "/api/image_fetcher",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/maintenance",
+      "schedule": "0 6 * * *"
     }
   ]
 }
