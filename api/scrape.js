@@ -321,9 +321,10 @@ export default async function handler(req, res) {
     }
     const { search_queries, gemini_prompt } = configData[0]
 
-    // 2. Coletar URLs da Busca (apenas as 3 primeiras queries para caber no tempo do serverless)
+    // 2. Coletar URLs da Busca (apenas 3 aleatórias para caber no tempo do serverless)
     logMessage("🌐 Coletando URLs da busca...")
-    const queriesReduzidas = search_queries.slice(0, 3)
+    const shuffledQueries = [...search_queries].sort(() => 0.5 - Math.random())
+    const queriesReduzidas = shuffledQueries.slice(0, 3)
     const urlsBusca = []
     for (const query of queriesReduzidas) {
       const urls = await buscarNaWeb(query)
