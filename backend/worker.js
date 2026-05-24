@@ -171,11 +171,11 @@ async function extrairComGemini(promptBase, item) {
     return parseJsonResp(text);
   } catch (err) {
     if (await isQuotaError(err.message)) {
-      logMessage(`⚠️ Limite do Gemini atingido. Acionando Fallback Groq (llama3-70b-8192)...`);
+      logMessage(`⚠️ Limite do Gemini atingido. Acionando Fallback Groq (llama-3.3-70b-versatile)...`);
       if (!GROQ_API_KEY) throw new Error("Cota Gemini excedida e GROQ_API_KEY ausente.");
       const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
       const completion = await openai.chat.completions.create({
-        model: "llama3-70b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }]
       });
       return parseJsonResp(completion.choices[0].message.content);
@@ -304,15 +304,19 @@ async function rotinaScrape() {
         await new Promise(r => setTimeout(r, 10000)); // Super delay pro Gemini
 
       } catch (err) {
-        logMessage(`❌ Erro Gemini: ${err.message}`);
-        if (await isQuotaError(err.message)) {
-          logMessage("🚫 Cota do Gemini estourada (429/503). Abortando esteira de processamento por agora.");
-          break; // Sai do loop e deixa o resto pra próxima execução de 4h
+        logMessage(`❌ Erro LLM: ${err.message}`);
+        const isQuota = await isQuotaError(err.message);
+        const isHardError = err.message.includes('400') || err.message.includes('decommissioned') || err.message.includes('not supported');
+        if (isQuota) {
+          logMessage("🚫 Cota do Gemini + Groq estourada. Abortando esteira por agora.");
+          break;
         } else {
           const novasTentativas = (item.tentativas || 0) + 1;
-          const novoStatus = novasTentativas >= 3 ? 'failed' : 'pending';
+          // Se erro duro (400) ou já tentou 3x, marca como 'failed' e continua
+          const novoStatus = (isHardError || novasTentativas >= 3) ? 'failed' : 'pending';
+          logMessage(`⚠️ Item marcado como '${novoStatus}' (tentativa ${novasTentativas}).`);
           await supabaseRequest('PATCH', `scraper_queue?id=eq.${item.id}`, { status: novoStatus, tentativas: novasTentativas }).catch(()=>{});
-          await new Promise(r => setTimeout(r, 5000));
+          await new Promise(r => setTimeout(r, 3000));
         }
       }
     }
@@ -354,7 +358,7 @@ async function callGemini(promptText) {
       logMessage(`⚠️ Fallback Groq acionado na Manutenção...`);
       const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
       const completion = await openai.chat.completions.create({
-        model: "llama3-70b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: promptText }]
       });
       return parseJsonResp(completion.choices[0].message.content);
