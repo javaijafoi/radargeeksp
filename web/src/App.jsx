@@ -16,6 +16,7 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
   const [authError, setAuthError] = useState(null)
+  const [showLoginPopup, setShowLoginPopup] = useState(false)
 
   // Inputs de configuração temporários
   const [inputUrl, setInputUrl] = useState(config.url)
@@ -92,6 +93,27 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [config])
 
+  // Konami Code Listener
+  useEffect(() => {
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    let konamiIndex = 0;
+
+    const handleKeyDown = (e) => {
+      if (e.key === konamiCode[konamiIndex] || e.key.toLowerCase() === konamiCode[konamiIndex].toLowerCase()) {
+        konamiIndex++;
+        if (konamiIndex === konamiCode.length) {
+          setShowLoginPopup(true);
+          konamiIndex = 0;
+        }
+      } else {
+        konamiIndex = 0;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoginLoading(true)
@@ -112,7 +134,6 @@ export default function App() {
 
   // Carregar dados se configurado ou ler fallback local
   const fetchDados = async () => {
-    if (!session) return // Só carrega se estiver logado
     setLoading(true)
     setError(null)
     try {
@@ -443,11 +464,14 @@ export default function App() {
     return metrics;
   }, [logs]);
 
-  // RENDERIZAÇÃO DA TELA DE LOGIN (Se configurado e sem sessão)
-  if (config.isConfigured && !session) {
+  // RENDERIZAÇÃO DA TELA DE LOGIN (PopUp Secreto)
+  if (showLoginPopup && !session) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)', padding: '1rem' }}>
-        <div className="cyber-card-terminal" style={{ width: '100%', maxWidth: '420px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)', padding: '1rem', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}>
+        <div className="cyber-card-terminal" style={{ width: '100%', maxWidth: '420px', position: 'relative' }}>
+          <button onClick={() => setShowLoginPopup(false)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={16} />
+          </button>
           <div className="terminal-header">
             <div className="terminal-dot red"></div>
             <div className="terminal-dot yellow"></div>
@@ -536,7 +560,7 @@ export default function App() {
               <LogOut size={14} /> Sair
             </button>
           )}
-          {config.isConfigured && session && (
+          {config.isConfigured && (
             <button 
               className="cyber-btn" 
               onClick={fetchDados} 
@@ -558,8 +582,7 @@ export default function App() {
         </div>
       </header>
 
-      {session && (
-        <div className="tabs-container">
+      <div className="tabs-container">
           <button 
             className={`tab-btn ${activeTab === 'eventos' ? 'active' : ''}`}
             onClick={() => { setActiveTab('eventos'); setFilterOption('todos'); }}
@@ -581,15 +604,16 @@ export default function App() {
             <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
             Lugares Fixos
           </button>
-          <button 
-            className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
-            onClick={() => setActiveTab('logs')}
-          >
-            <Terminal size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-            Painel do Scraper
-          </button>
+          {session && (
+            <button 
+              className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
+              onClick={() => setActiveTab('logs')}
+            >
+              <Terminal size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+              Painel do Scraper
+            </button>
+          )}
         </div>
-      )}
 
       {error && (
         <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid var(--color-danger)', padding: '1.25rem', marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}>
@@ -601,7 +625,7 @@ export default function App() {
         </div>
       )}
 
-      {session && activeTab !== 'logs' && activeTab !== 'calendario' && !loading && (
+      {activeTab !== 'logs' && activeTab !== 'calendario' && !loading && (
         <div className="controls-bar">
           <div className="search-input-container">
             <span className="search-icon-inside">
@@ -633,7 +657,7 @@ export default function App() {
         </div>
       )}
 
-      {loading && session && eventos.length === 0 && locais.length === 0 && (
+      {loading && eventos.length === 0 && locais.length === 0 && (
         <div className="empty-state">
           <span className="empty-icon" style={{ animation: 'spin 2s linear infinite' }}>
             <RefreshCw size={44} />
@@ -643,7 +667,7 @@ export default function App() {
         </div>
       )}
 
-      {session && (eventos.length > 0 || locais.length > 0 || !loading) && (
+      {(eventos.length > 0 || locais.length > 0 || !loading) && (
         <div className="cyber-skew-section">
           {activeTab === 'eventos' ? (
             filteredEventos.length > 0 ? (
@@ -948,7 +972,7 @@ export default function App() {
             )
           })() : null}
 
-          {activeTab === 'logs' && (
+          {session && activeTab === 'logs' && (
             <div style={{ animation: 'fade-in 0.3s ease-out' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
                 
