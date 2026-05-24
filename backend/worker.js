@@ -432,12 +432,110 @@ async function rotinaMaintenance() {
   }
 }
 
+// ==========================================
+// ROTINA: CONSOLIDAR PESQUISA (só processa a fila, sem busca)
+// ==========================================
+async function rotinaProcessarFila() {
+  logMessage("📦 INICIANDO CONSOLIDAÇÃO DA FILA (sem nova busca) 📦");
+  let locaisCount = 0;
+  let eventosCount = 0;
+
+  try {
+    const configData = await supabaseRequest('GET', 'scraper_config?id=eq.1&select=*');
+    if (!configData || configData.length === 0) throw new Error("scraper_config vazio.");
+    const { gemini_prompt } = configData[0];
+
+    const pendingTotal = await supabaseRequest('GET', 'scraper_queue?status=eq.pending&select=id');
+    logMessage(`📊 ${(pendingTotal || []).length} itens pendentes na fila.`);
+
+    logMessage("🧠 Iniciando consumo da fila com Gemini + Groq...");
+    while (true) {
+      const pendingItems = await supabaseRequest('GET', 'scraper_queue?status=eq.pending&order=criado_em.asc&limit=1');
+      if (!pendingItems || pendingItems.length === 0) {
+        logMessage("✅ Fila vazia! Tudo processado.");
+        break;
+      }
+
+      const item = pendingItems[0];
+      logMessage(`🤖 Lendo: ${item.url}`);
+      try {
+        const dadosEstruturados = await extrairComGemini(gemini_prompt, item);
+        const locaisIds = {};
+
+        if (dadosEstruturados?.locais?.length) {
+          for (const local of dadosEstruturados.locais) {
+            const resLocal = await supabaseRequest('POST', 'locais_fixos', {
+              nome: local.nome, descricao: local.descricao, endereco: local.endereco,
+              preco_medio: local.preco_medio, fonte_url: local.fonte_url || item.url,
+              ia_inferido: Boolean(local.ia_inferido), tags_consumo: local.tags_consumo || [],
+              imagem_hero_path: local.imagem_hero_path || item.og_image
+            }).catch(() => {});
+            if (resLocal?.length) { locaisIds[local.nome] = resLocal[0].id; locaisCount++; }
+          }
+        }
+
+        if (dadosEstruturados?.eventos?.length) {
+          for (const evento of dadosEstruturados.eventos) {
+            const novoEvento = {
+              titulo: evento.titulo, descricao: evento.descricao, endereco: evento.endereco,
+              preco_entrada: evento.preco_entrada, fonte_url: evento.fonte_url || item.url,
+              ia_inferido: Boolean(evento.ia_inferido), data_hora: new Date(evento.data_hora || Date.now()).toISOString(),
+              ia_score_cilada: parseInt(evento.ia_score_cilada) || 5, kid_friendly: Boolean(evento.kid_friendly),
+              imagem_flyer_path: evento.imagem_flyer_path || item.og_image
+            };
+            if (evento.local_nome && locaisIds[evento.local_nome]) novoEvento.local_id = locaisIds[evento.local_nome];
+            const resEv = await supabaseRequest('POST', 'eventos', novoEvento).catch(() => {});
+            if (resEv?.length) eventosCount++;
+          }
+        }
+
+        await supabaseRequest('PATCH', `scraper_queue?id=eq.${item.id}`, { status: 'processed' });
+        logMessage(`✅ Sucesso. +${locaisCount} locais | +${eventosCount} eventos. Aguardando 10s...`);
+        await new Promise(r => setTimeout(r, 10000));
+
+      } catch (err) {
+        logMessage(`❌ Erro LLM: ${err.message}`);
+        const isQuota = await isQuotaError(err.message);
+        const isHardError = err.message.includes('400') || err.message.includes('decommissioned') || err.message.includes('not supported');
+        if (isQuota) {
+          logMessage("🚫 Cota do Gemini + Groq estourada. Abortando esteira por agora.");
+          break;
+        } else {
+          const novasTentativas = (item.tentativas || 0) + 1;
+          const novoStatus = (isHardError || novasTentativas >= 3) ? 'failed' : 'pending';
+          logMessage(`⚠️ Item marcado como '${novoStatus}' (tentativa ${novasTentativas}).`);
+          await supabaseRequest('PATCH', `scraper_queue?id=eq.${item.id}`, { status: novoStatus, tentativas: novasTentativas }).catch(() => {});
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+    }
+
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: true, locais_processados: locaisCount, eventos_novos: eventosCount,
+      logs: "=== CONSOLIDAÇÃO DA FILA ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+    logMessage(`🏁 Consolidação concluída! ${locaisCount} locais e ${eventosCount} eventos criados.`);
+
+  } catch (err) {
+    logMessage(`❌ FATAL ERRO CONSOLIDAÇÃO: ${err.message}`);
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: false, locais_processados: 0, eventos_novos: 0,
+      logs: "=== ERRO CONSOLIDAÇÃO ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+    process.exit(1);
+  }
+}
+
 // --------------------------------------------------------------------------------------
 const args = process.argv.slice(2);
 if (args.includes('--scrape')) {
   rotinaScrape();
+} else if (args.includes('--process-queue')) {
+  rotinaProcessarFila();
 } else if (args.includes('--maintenance')) {
   rotinaMaintenance();
 } else {
-  console.log("Forneça --scrape ou --maintenance");
+  console.log("Forneça --scrape, --process-queue ou --maintenance");
 }
