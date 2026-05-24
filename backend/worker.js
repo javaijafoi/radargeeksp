@@ -9,6 +9,10 @@ const __dirname = path.dirname(__filename);
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+import OpenAI from 'openai';
 
 let executionLogs = [];
 function logMessage(msg) {
@@ -54,49 +58,31 @@ async function supabaseRequest(metodo, endpoint, dados = null) {
 // ==========================================
 // MINERAÇÃO WEB E FILTRAGEM
 // ==========================================
-async function queryDDG(endpoint, query) {
-  const p = new URLSearchParams({ q: query, df: 'w' });
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-    body: p.toString()
-  });
-  if (!res.ok) throw new Error(`DDG retornou status ${res.status}`);
-
-  const html = await res.text();
-  let urls = [];
-  const re = /href=["']([^"']+)["']/g;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    let url = m[1].replace(/&amp;/g, '&');
-    if (url.includes('uddg=')) {
-      const match = url.match(/uddg=([^&"']+)/);
-      if (match) {
-        try { url = decodeURIComponent(match[1]); } catch (e) {}
-      }
-    }
-    if (url.startsWith('http') && !url.includes('duckduckgo.com/') && !url.includes('google.com/')) {
-      urls.push(url);
-    }
+async function queryBraveSearch(query) {
+  if (!BRAVE_API_KEY) {
+    logMessage("⚠️ BRAVE_API_KEY ausente. Busca ignorada.");
+    return [];
   }
-  return [...new Set(urls)].slice(0, 5); // Pega 5 urls por termo
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`;
+  const res = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'X-Subscription-Token': BRAVE_API_KEY
+    }
+  });
+  if (!res.ok) throw new Error(`Brave retornou status ${res.status}`);
+  const data = await res.json();
+  if (!data.web || !data.web.results) return [];
+  return data.web.results.map(r => r.url);
 }
 
 async function buscarNaWeb(query) {
-  logMessage(`🔍 Buscando na web por: ${query}...`);
+  logMessage(`🔍 Buscando na web via Brave por: ${query}...`);
   let urls = [];
   try {
-    urls = await queryDDG('https://lite.duckduckgo.com/lite/', query);
+    urls = await queryBraveSearch(query);
   } catch (e) {
-    logMessage(`  ⚠️ DDG Lite falhou: ${e.message}`);
-  }
-  if (urls.length === 0) {
-    try {
-      urls = await queryDDG('https://html.duckduckgo.com/html/', query);
-    } catch (e) {}
+    logMessage(`  ⚠️ Brave Search falhou: ${e.message}`);
   }
   logMessage(`  ✅ ${urls.length} URLs encontradas`);
   return urls;
@@ -162,18 +148,33 @@ async function isQuotaError(msg) {
 }
 
 async function extrairComGemini(promptBase, item) {
-  if (!GEMINI_API_KEY) throw new Error('Gemini API Key não configurada.');
-  
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
   const textoFontes = `\n--- FONTE 1: ${item.titulo || item.url} ---\nFONTE URL: ${item.url}\nDESCRIÇÃO: ${item.descricao}\nCONTEUDO:\n${item.conteudo_texto}`;
   const imagensInfo = item.og_image ? `\n\n🖼️ IMAGEM REAL DA PÁGINA: ${item.og_image}` : '\n\n[Sem imagens reais — use Unsplash]';
   const prompt = `${promptBase}${imagensInfo}\n\nFONTES:\n${textoFontes}`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  
+  try {
+    if (!GEMINI_API_KEY) throw new Error('Gemini API Key não configurada.');
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return parseJsonResp(text);
+  } catch (err) {
+    if (await isQuotaError(err.message)) {
+      logMessage(`⚠️ Limite do Gemini atingido. Acionando Fallback Groq (llama3-70b-8192)...`);
+      if (!GROQ_API_KEY) throw new Error("Cota Gemini excedida e GROQ_API_KEY ausente.");
+      const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
+      const completion = await openai.chat.completions.create({
+        model: "llama3-70b-8192",
+        messages: [{ role: "user", content: prompt }]
+      });
+      return parseJsonResp(completion.choices[0].message.content);
+    }
+    throw err;
+  }
+}
+
+function parseJsonResp(text) {
   const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*}/);
   if (jsonMatch) return JSON.parse(jsonMatch[1] || jsonMatch[0]);
   return JSON.parse(text);
@@ -313,13 +314,23 @@ async function webSearchSnippets(query) {
 }
 
 async function callGemini(promptText) {
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-  const result = await model.generateContent(promptText);
-  const text = result.response.text();
-  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*}/);
-  if (jsonMatch) return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-  return JSON.parse(text);
+  try {
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(promptText);
+    return parseJsonResp(result.response.text());
+  } catch (err) {
+    if (await isQuotaError(err.message)) {
+      logMessage(`⚠️ Fallback Groq acionado na Manutenção...`);
+      const openai = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: GROQ_API_KEY });
+      const completion = await openai.chat.completions.create({
+        model: "llama3-70b-8192",
+        messages: [{ role: "user", content: promptText }]
+      });
+      return parseJsonResp(completion.choices[0].message.content);
+    }
+    throw err;
+  }
 }
 
 async function rotinaMaintenance() {
