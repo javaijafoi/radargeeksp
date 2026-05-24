@@ -2,7 +2,11 @@
   "name": "radar-geek-sp",
   "version": "1.0.0",
   "description": "Radar Geek SP - Scraper Autônomo e Plataforma React",
+  "type": "module",
   "scripts": {
     "build": "cd web && npm install && npm run build && cd .. && mkdir -p public && cp -r web/dist/* public/"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.1"
   }
 }
