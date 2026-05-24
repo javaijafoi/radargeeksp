@@ -30,7 +30,7 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install @google/generative-ai
+        run: npm install @google/generative-ai openai
 
       - name: Run Scrape Routine (Cron)
         if: github.event.schedule == '0 0 * * *' || github.event.inputs.routine == 'scrape'
