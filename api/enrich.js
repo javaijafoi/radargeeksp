@@ -169,9 +169,27 @@ export default async function handler(req, res) {
     }
 
     logMessage(`🎉 Processamento concluído. ${enriquecidosCount} eventos enriquecidos nesta rodada.`)
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: true,
+      locais_processados: 0,
+      eventos_novos: enriquecidosCount,
+      logs: "=== ENRIQUECIMENTO DE EVENTOS ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(200).json({ sucesso: true, enriquecidos: enriquecidosCount, logs: executionLogs.join('\n') })
   } catch (err) {
     logMessage(`❌ FATAL ERROR: ${err.message}`)
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: false,
+      locais_processados: 0,
+      eventos_novos: 0,
+      logs: "=== ENRIQUECIMENTO DE EVENTOS (Erro) ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(500).json({ sucesso: false, error: err.message, logs: executionLogs.join('\n') })
   }
 }

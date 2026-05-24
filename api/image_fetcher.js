@@ -113,10 +113,28 @@ export default async function handler(req, res) {
     }
 
     logMessage("🏁 Fim do processamento de imagens.");
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: true,
+      locais_processados: 0,
+      eventos_novos: 0,
+      logs: "=== BUSCA DE IMAGENS ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(200).json({ status: 'ok', logs: executionLogs });
 
   } catch (err) {
     logMessage(`❌ Falha Crítica: ${err.message}`);
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: false,
+      locais_processados: 0,
+      eventos_novos: 0,
+      logs: "=== BUSCA DE IMAGENS (Erro) ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(500).json({ error: err.message, logs: executionLogs });
   }
 }

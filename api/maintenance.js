@@ -229,10 +229,28 @@ export default async function handler(req, res) {
     }
 
     logMessage("🏁 Fim do processamento de manutenção.");
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: true,
+      locais_processados: 0,
+      eventos_novos: 0,
+      logs: "=== MANUTENÇÃO ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(200).json({ status: 'ok', logs: executionLogs });
 
   } catch (err) {
     logMessage(`❌ Falha Crítica na Manutenção: ${err.message}`);
+    
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: false,
+      locais_processados: 0,
+      eventos_novos: 0,
+      logs: "=== MANUTENÇÃO (Erro) ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
     return res.status(500).json({ error: err.message, logs: executionLogs });
   }
 }
