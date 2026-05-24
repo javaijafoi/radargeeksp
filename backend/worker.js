@@ -12,6 +12,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
+// Imagem padrão usada quando nenhuma imagem real for encontrada
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=800&q=80'; // aesthetic neon geek
+
 import OpenAI from 'openai';
 
 let executionLogs = [];
@@ -303,12 +306,18 @@ async function rotinaScrape() {
 
         if (dadosEstruturados?.eventos?.length) {
           for (const evento of dadosEstruturados.eventos) {
+            // Descarta eventos online
+            if (evento.modalidade === 'online') {
+              logMessage(`🚫 Descartando evento online: ${evento.titulo}`);
+              continue;
+            }
             const novoEvento = {
               titulo: evento.titulo, descricao: evento.descricao, endereco: evento.endereco,
               preco_entrada: evento.preco_entrada, fonte_url: evento.fonte_url || item.url,
               ia_inferido: Boolean(evento.ia_inferido), data_hora: new Date(evento.data_hora || Date.now()).toISOString(),
               ia_score_cilada: parseInt(evento.ia_score_cilada) || 5, kid_friendly: Boolean(evento.kid_friendly),
-              imagem_flyer_path: evento.imagem_flyer_path || item.og_image
+              is_free: Boolean(evento.is_free), modalidade: evento.modalidade || 'presencial',
+              imagem_flyer_path: evento.imagem_flyer_path || item.og_image || DEFAULT_IMAGE
             };
             if (evento.local_nome && locaisIds[evento.local_nome]) novoEvento.local_id = locaisIds[evento.local_nome];
             const resEv = await supabaseRequest('POST', 'eventos', novoEvento).catch(()=>{});
@@ -490,12 +499,18 @@ async function rotinaProcessarFila() {
 
         if (dadosEstruturados?.eventos?.length) {
           for (const evento of dadosEstruturados.eventos) {
+            // Descarta eventos online
+            if (evento.modalidade === 'online') {
+              logMessage(`🚫 Descartando evento online: ${evento.titulo}`);
+              continue;
+            }
             const novoEvento = {
               titulo: evento.titulo, descricao: evento.descricao, endereco: evento.endereco,
               preco_entrada: evento.preco_entrada, fonte_url: evento.fonte_url || item.url,
               ia_inferido: Boolean(evento.ia_inferido), data_hora: new Date(evento.data_hora || Date.now()).toISOString(),
               ia_score_cilada: parseInt(evento.ia_score_cilada) || 5, kid_friendly: Boolean(evento.kid_friendly),
-              imagem_flyer_path: evento.imagem_flyer_path || item.og_image
+              is_free: Boolean(evento.is_free), modalidade: evento.modalidade || 'presencial',
+              imagem_flyer_path: evento.imagem_flyer_path || item.og_image || DEFAULT_IMAGE
             };
             if (evento.local_nome && locaisIds[evento.local_nome]) novoEvento.local_id = locaisIds[evento.local_nome];
             const resEv = await supabaseRequest('POST', 'eventos', novoEvento).catch(() => {});
