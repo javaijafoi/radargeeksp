@@ -1,0 +1,49 @@
+name: Radar Geek SP - Sprawl Worker
+
+on:
+  schedule:
+    # Esteira de mineração roda a cada 4 horas
+    - cron: '0 */4 * * *'
+    # Esteira de manutenção roda 1x por dia às 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      routine:
+        description: 'Qual rotina rodar?'
+        required: true
+        default: 'scrape'
+        type: choice
+        options:
+        - scrape
+        - maintenance
+
+jobs:
+  run-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install @google/generative-ai
+
+      - name: Run Scrape Routine (Cron)
+        if: github.event.schedule == '0 */4 * * *' || github.event.inputs.routine == 'scrape'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node backend/worker.js --scrape
+
+      - name: Run Maintenance Routine (Cron)
+        if: github.event.schedule == '0 3 * * *' || github.event.inputs.routine == 'maintenance'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node backend/worker.js --maintenance

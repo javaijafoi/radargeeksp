@@ -1035,16 +1035,10 @@ export default function App() {
                       <Clock size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--accent)' }} /> <strong>Último:</strong> {logs.length > 0 ? formatarData(logs[0].executado_em) : 'Nenhum'}
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--color-safe)' }} /> <strong>Scan:</strong> 00:00 BRT (Nuvem)
+                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--color-safe)' }} /> <strong>Esteira Mestre:</strong> A cada 4 horas (GitHub)
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--accent-secondary)' }} /> <strong>Integração:</strong> 01:00 BRT (Nuvem)
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: 'var(--accent-tertiary)' }} /> <strong>Imagens:</strong> 02:00 BRT (Nuvem)
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}>
-                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: '#fff' }} /> <strong>Limpeza/Enriquecimento:</strong> 03:00 BRT (Nuvem)
+                      <RefreshCw size={12} style={{ verticalAlign: 'middle', marginRight: '4px', color: '#fff' }} /> <strong>Limpeza/Enriquecimento:</strong> 03:00 (GitHub)
                     </span>
                   </div>
                 </div>
@@ -1143,11 +1137,11 @@ export default function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                       <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Terminal size={14} style={{ color: 'var(--accent)' }} /> 
-                        CONSOLE DE EXECUÇÃO EM NUVEM
+                        CONSOLE GITHUB / VERCEL
                       </h3>
                       <button className="cyber-btn" onClick={triggerScrapeNuvem} disabled={scrapeLoading} style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}>
                         <RefreshCw size={12} style={{ animation: scrapeLoading ? 'spin 1.5s linear infinite' : 'none' }} />
-                        {scrapeLoading ? 'Escaneando...' : 'Rodar Scraper (Vercel)'}
+                        {scrapeLoading ? 'Escaneando...' : 'Gatilho Rápido (1 Item Vercel)'}
                       </button>
                     </div>
                     <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
