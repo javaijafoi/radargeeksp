@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 import OpenAI from 'openai';
@@ -58,33 +58,43 @@ async function supabaseRequest(metodo, endpoint, dados = null) {
 // ==========================================
 // MINERAÇÃO WEB E FILTRAGEM
 // ==========================================
-async function queryBraveSearch(query) {
-  if (!BRAVE_API_KEY) {
-    logMessage("⚠️ BRAVE_API_KEY ausente. Busca ignorada.");
+async function queryTavilySearch(query) {
+  if (!TAVILY_API_KEY) {
+    logMessage("⚠️ TAVILY_API_KEY ausente. Busca ignorada.");
     return [];
   }
-  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`;
-  const res = await fetch(url, {
-    headers: {
-      'Accept': 'application/json',
-      'X-Subscription-Token': BRAVE_API_KEY
-    }
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      api_key: TAVILY_API_KEY,
+      query: query,
+      search_depth: 'basic',
+      include_raw_content: true,
+      max_results: 5
+    })
   });
-  if (!res.ok) throw new Error(`Brave retornou status ${res.status}`);
+  if (!res.ok) throw new Error(`Tavily retornou status ${res.status}`);
   const data = await res.json();
-  if (!data.web || !data.web.results) return [];
-  return data.web.results.map(r => r.url);
+  if (!data.results) return [];
+  
+  return data.results.map(r => ({
+    url: r.url,
+    titulo: r.title,
+    conteudo_texto: r.raw_content ? r.raw_content.substring(0, 4000) : r.content,
+    is_tavily: true
+  }));
 }
 
 async function buscarNaWeb(query) {
-  logMessage(`🔍 Buscando na web via Brave por: ${query}...`);
+  logMessage(`🔍 Buscando na web via Tavily por: ${query}...`);
   let urls = [];
   try {
-    urls = await queryBraveSearch(query);
+    urls = await queryTavilySearch(query);
   } catch (e) {
-    logMessage(`  ⚠️ Brave Search falhou: ${e.message}`);
+    logMessage(`  ⚠️ Tavily Search falhou: ${e.message}`);
   }
-  logMessage(`  ✅ ${urls.length} URLs encontradas`);
+  logMessage(`  ✅ ${urls.length} links encontrados`);
   return urls;
 }
 
@@ -197,25 +207,46 @@ async function rotinaScrape() {
 
     // 2. Coletar URLs da Busca (TODOS OS TERMOS)
     logMessage(`🌐 Iniciando busca em massa para ${search_queries.length} termos...`);
-    let todasUrls = [];
+    let resultadosBusca = [];
     for (const query of search_queries) {
       const urls = await buscarNaWeb(query);
-      todasUrls.push(...urls);
-      await new Promise(r => setTimeout(r, 4000)); // Espera 4s entre pesquisas para DDG não bloquear
+      resultadosBusca.push(...urls);
+      await new Promise(r => setTimeout(r, 2000)); // Espera 2s
     }
 
     // 3. Coletar Feed RSS
     const feedItems = await supabaseRequest('GET', 'scraper_feed?ativo=eq.true&select=url').catch(() => []);
-    todasUrls.push(...feedItems.map(i => i.url));
+    resultadosBusca.push(...feedItems.map(i => ({ url: i.url, is_tavily: false })));
 
     // 4. Filtrar e Salvar no Staging
-    todasUrls = [...new Set(todasUrls)];
-    const urlsNovas = await filtrarUrlsNovas(todasUrls);
-    logMessage(`📊 Das ${todasUrls.length} URLs, ${urlsNovas.length} são novas inéditas.`);
+    const uniqueMap = new Map();
+    for (const item of resultadosBusca) {
+      if (!uniqueMap.has(item.url)) uniqueMap.set(item.url, item);
+    }
+    const unicos = Array.from(uniqueMap.values());
+    
+    const apenasUrls = unicos.map(i => i.url);
+    const urlsNovasStrings = await filtrarUrlsNovas(apenasUrls);
+    const itensNovos = unicos.filter(i => urlsNovasStrings.includes(i.url));
+
+    logMessage(`📊 Das ${unicos.length} links unicos, ${itensNovos.length} são novos inéditos.`);
 
     let enfileiradosCount = 0;
-    for (const url of urlsNovas) {
-      const pag = await extrairPaginaEstruturada(url);
+    for (const item of itensNovos) {
+      let pag;
+      if (item.is_tavily && item.conteudo_texto) {
+        pag = {
+          url: item.url,
+          titulo: item.titulo,
+          descricao: '',
+          conteudo_texto: item.conteudo_texto,
+          og_image: null
+        };
+      } else {
+        pag = await extrairPaginaEstruturada(item.url);
+        await new Promise(r => setTimeout(r, 1000)); // Espera 1s entre scrapes manuais
+      }
+      
       if (pag) {
         await supabaseRequest('POST', 'scraper_queue', {
           url: pag.url, titulo: pag.titulo, descricao: pag.descricao,
@@ -223,7 +254,6 @@ async function rotinaScrape() {
         }).catch(()=>{});
         enfileiradosCount++;
       }
-      await new Promise(r => setTimeout(r, 1000)); // Espera 1s entre scrapes
     }
     logMessage(`🏁 Fila atualizada: +${enfileiradosCount} pendentes.`);
 
