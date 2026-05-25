@@ -1,5 +1,8 @@
 name: Radar Geek SP - Sprawl Worker
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     # Esteira de mineração roda 1x ao dia (00:00 UTC)
@@ -29,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Dependencies
         run: npm install @google/generative-ai openai
