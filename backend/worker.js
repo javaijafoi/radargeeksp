@@ -557,14 +557,79 @@ async function rotinaProcessarFila() {
   }
 }
 
+// ==========================================
+// ROTINA: LIMPEZA DA BASE (remove eventos não-nerd existentes)
+// ==========================================
+async function rotinaLimpeza() {
+  logMessage("🧹 INICIANDO LIMPEZA DA BASE DE EVENTOS 🧹");
+  let deletadosCount = 0;
+
+  try {
+    // Busca todos eventos em lotes de 50
+    let offset = 0;
+    const BATCH = 50;
+
+    while (true) {
+      const eventos = await supabaseRequest('GET', `eventos?select=id,titulo,descricao&order=id.asc&limit=${BATCH}&offset=${offset}`);
+      if (!eventos || eventos.length === 0) break;
+
+      logMessage(`🔍 Avaliando lote de ${eventos.length} eventos (offset ${offset})...`);
+
+      const prompt = `Você é um curador rigoroso do universo Geek/Nerd/Otaku.
+Analisando a lista de eventos abaixo, identifique os IDs dos eventos que NÃO pertencem ao universo nerd/geek/anime/RPG presencial/boardgame/cosplay/HQ/sci-fi/fantasy/cultura pop japonesa.
+Descarte: eventos esportivos, shows musicais comuns, feiras de artesanato sem tema nerd, cursos, eventos políticos, religiosos, online/virtuais, shows de stand-up sem tema nerd.
+Retorne APENAS um JSON: { "deletar": ["uuid1", "uuid2"] }
+Se todos forem relevantes, retorne: { "deletar": [] }
+
+Eventos:
+${JSON.stringify(eventos.map(e => ({ id: e.id, titulo: e.titulo, descricao: (e.descricao || '').substring(0, 150) })))}`;
+
+      try {
+        const resultado = await extrairComGroq(prompt);
+        const ids = resultado?.deletar || [];
+
+        if (ids.length > 0) {
+          logMessage(`🚫 Deletando ${ids.length} eventos não-nerd deste lote...`);
+          for (const id of ids) {
+            await supabaseRequest('DELETE', `eventos?id=eq.${id}`).catch(() => {});
+            logMessage(`  ❌ Deletado: ${eventos.find(e => e.id === id)?.titulo || id}`);
+            deletadosCount++;
+          }
+        } else {
+          logMessage(`✅ Lote limpo, todos são nerd-relevantes.`);
+        }
+      } catch (e) {
+        logMessage(`⚠️ Erro ao avaliar lote: ${e.message}`);
+      }
+
+      if (eventos.length < BATCH) break;
+      offset += BATCH;
+      await new Promise(r => setTimeout(r, 5000)); // pausa entre lotes
+    }
+
+    logMessage(`🏁 Limpeza concluída! ${deletadosCount} eventos não-nerd removidos.`);
+    await supabaseRequest('POST', 'historico_scraping', {
+      executado_em: new Date().toISOString(),
+      sucesso: true, locais_processados: 0, eventos_novos: -deletadosCount,
+      logs: "=== LIMPEZA DA BASE ===\n" + executionLogs.join('\n')
+    }).catch(() => {});
+
+  } catch (err) {
+    logMessage(`❌ FATAL ERRO LIMPEZA: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 // --------------------------------------------------------------------------------------
 const args = process.argv.slice(2);
 if (args.includes('--scrape')) {
   rotinaScrape();
 } else if (args.includes('--process-queue')) {
   rotinaProcessarFila();
+} else if (args.includes('--cleanup')) {
+  rotinaLimpeza();
 } else if (args.includes('--maintenance')) {
   rotinaMaintenance();
 } else {
-  console.log("Forneça --scrape, --process-queue ou --maintenance");
+  console.log("Forneça --scrape, --process-queue, --cleanup ou --maintenance");
 }

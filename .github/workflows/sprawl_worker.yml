@@ -16,6 +16,7 @@ on:
         options:
         - scrape
         - process-queue
+        - cleanup
         - maintenance
 
 jobs:
@@ -51,6 +52,14 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: node backend/worker.js --process-queue
+
+      - name: Limpeza da Base (Remove eventos nao-nerd)
+        if: github.event.inputs.routine == 'cleanup'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: node backend/worker.js --cleanup
 
       - name: Run Maintenance Routine (Cron)
         if: github.event.schedule == '0 3 * * *' || github.event.inputs.routine == 'maintenance'
