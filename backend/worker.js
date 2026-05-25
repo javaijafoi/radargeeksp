@@ -236,6 +236,7 @@ async function rotinaScrape() {
 
     // 3. Coletar Feed RSS
     const feedItems = await supabaseRequest('GET', 'scraper_feed?ativo=eq.true&select=url').catch(() => []);
+    const rssUrls = Array.from(new Set(feedItems.map(i => i.url)));
     resultadosBusca.push(...feedItems.map(i => ({ url: i.url, is_tavily: false })));
 
     // 4. Filtrar e Salvar no Staging
@@ -250,6 +251,16 @@ async function rotinaScrape() {
     const itensNovos = unicos.filter(i => urlsNovasStrings.includes(i.url));
 
     logMessage(`📊 Das ${unicos.length} links unicos, ${itensNovos.length} são novos inéditos.`);
+
+    // Estatísticas específicas do RSS/feed manual
+    if (rssUrls.length > 0) {
+      const urlsNovasSet = new Set(urlsNovasStrings);
+      const rssNovos = rssUrls.filter(url => urlsNovasSet.has(url));
+      const rssIntegrados = rssUrls.filter(url => !urlsNovasSet.has(url));
+      logMessage(`📡 RSS: ${rssUrls.length} resultados | ${rssIntegrados.length} já integrados | ${rssNovos.length} faltam integrar`);
+    } else {
+      logMessage(`📡 RSS: 0 resultados de feed ativos`);
+    }
 
     let enfileiradosCount = 0;
     for (const item of itensNovos) {

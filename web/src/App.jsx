@@ -289,7 +289,7 @@ export default function App() {
         setError(`Erro na raspagem da Nuvem: ${data.logs || 'Sem detalhes'}`)
       }
     } catch (e) {
-      setError(`Esse botão funciona após o deploy na Vercel com as variáveis de ambiente setadas. Para rodar agora na sua máquina local, digite 'node backend/scraper.js' no seu terminal. Detalhes: ${e.message}`)
+      setError(`Esse botão funciona após o deploy na Vercel com as variáveis de ambiente setadas. Para rodar agora na sua máquina local, digite 'node backend/worker.js --scrape' no seu terminal. Detalhes: ${e.message}`)
     } finally {
       setScrapeLoading(false)
     }
@@ -1243,7 +1243,7 @@ export default function App() {
                       Caso queira executar a varredura local usando sua API do Gemini e credenciais locais do Supabase, rode o comando no root:
                     </p>
                     <div style={{ background: '#050508', border: '1px solid var(--border)', padding: '0.6rem 0.8rem', fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--accent-secondary)', marginBottom: '1rem', overflowX: 'auto', clipPath: 'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)' }}>
-                      node backend/scraper.js
+                      node backend/worker.js --scrape
                     </div>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                       Assegure que as variáveis <code style={{ color: '#fff' }}>GEMINI_API_KEY</code> e chaves de banco estejam setadas no <code style={{ color: '#fff' }}>.env</code>.
