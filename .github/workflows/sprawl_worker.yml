@@ -7,6 +7,8 @@ on:
   schedule:
     # Esteira de mineração roda 1x ao dia (00:00 UTC)
     - cron: '0 0 * * *'
+    # Consolidação da Fila roda a cada 2 horas (no minuto 30 para evitar sobreposição)
+    - cron: '30 */2 * * *'
     # Esteira de manutenção roda 1x por dia às 03:00 UTC
     - cron: '0 3 * * *'
   workflow_dispatch:
@@ -48,7 +50,9 @@ jobs:
         run: node backend/worker.js --scrape
 
       - name: Consolidar Pesquisa (Processar Fila)
-        if: github.event.inputs.routine == 'process-queue'
+        if: |
+          github.event.inputs.routine == 'process-queue' ||
+          (github.event_name == 'schedule' && github.event.schedule != '0 0 * * *' && github.event.schedule != '0 3 * * *')
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
